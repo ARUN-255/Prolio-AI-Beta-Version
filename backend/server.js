@@ -11,6 +11,7 @@ app.use(express.json());
 
 const authRoutes = require('./routes/auth.routes');
 app.use('/api/auth',authRoutes);
+console.log('Auth routes loaded successfully');
 
 //Guys this our test route
 app.get('/',function(req,res){
