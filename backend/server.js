@@ -12,6 +12,8 @@ app.use(express.json());
 const authRoutes = require('./routes/auth.routes');
 app.use('/api/auth',authRoutes);
 console.log('Auth routes loaded successfully');
+const studentRoutes = require('./routes/student.routes');
+app.use('/api/student',studentRoutes);
 
 //Guys this our test route
 app.get('/',function(req,res){
