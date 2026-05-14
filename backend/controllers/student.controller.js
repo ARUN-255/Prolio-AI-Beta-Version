@@ -36,6 +36,28 @@ function getProfile(req,res){
         return res.status(200).json({profile:result.rows[0]});
     });
 }
+function updateProfile(req,res){
+    const user_id = req.params.user_id;
+    const name = req.body.name;
+    const bio = req.body.bio;
+    const skills = req.body.skills;
+    const github_url = req.body.github_url;
+    const linkedin_url = req.body.linkedin_url;
+
+    const query = 'UPDATE students SET name = $1,bio = $2,skills = $3,github_url = $4,linkedin_url = $5 WHERE user_id = $6 RETURNING*';
+    const values = [name,bio,skills,github_url,linkedin_url,user_id];
+
+    pool.query(query,values,function(err,result){
+        if(err){
+            return res.status(500).json({message:'Error updating profile'});
+        }
+        if(result.rows.length === 0){
+            return res.status(404).json({message:'Profile not found'});
+        }
+        return res.status(200).json({message:'profile updated successfully',profile:result.rows[0]});
+    });
+}
 
 module.exports.createProfile = createProfile;
 module.exports.getProfile = getProfile;
+module.exports.updateProfile = updateProfile;

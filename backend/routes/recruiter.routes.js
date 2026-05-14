@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const recruiterController = require('../controllers/recruiter.controller');
 
-router.get('/',function(req,res){
-    res.json({message:'AI routes comming soon'});
-});
+router.post('/profile',recruiterController.createProfile);
+router.get('/profile/:user_id',recruiterController.getProfile);
 
 module.exports = router;

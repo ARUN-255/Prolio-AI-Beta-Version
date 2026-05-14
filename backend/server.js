@@ -14,6 +14,8 @@ app.use('/api/auth',authRoutes);
 console.log('Auth routes loaded successfully');
 const studentRoutes = require('./routes/student.routes');
 app.use('/api/student',studentRoutes);
+const recruiterRoutes = require('./routes/recruiter.routes');
+app.use('/api/recruiter',recruiterRoutes);
 
 //Guys this our test route
 app.get('/',function(req,res){
