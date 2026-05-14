@@ -36,5 +36,28 @@ function getProfile(req,res){
     });
 }
 
+function postJob(req,res){
+    const recruiter_id = req.body.recruiter_id;
+    const title = req.body.title;
+    const description = req.body.description;
+    const required_skills = req.body.location;
+    const salary_range = req.body.salary_range;
+
+    if(!recruiter_id || !title){
+        return res.status(400).json({message:'Recruiter ID and title are required'});
+    }
+
+    const query = 'INSERT INTO jobs(recruiter_id,title,description,required_skills,location,salary_range) VALUES($1,$2.$3,$4,$5,$6) RETURNING*';
+    const values = [recruiter_id,title,description,required_skills,location,salary_range];
+
+    pool.query(query,values,function(err,result){
+        if(err){
+            return res.status(500).json({message:'Error posting job'});
+        }
+        return res.status(201).json({message:'Job posted successfully',job:result.rows[0]});
+    });
+}
+
 module.exports.createProfile = createProfile;
 module.exports.getProfile = getProfile;
+module.exports.postJob = postJob;
