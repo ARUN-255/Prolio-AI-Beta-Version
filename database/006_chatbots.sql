@@ -1,0 +1,9 @@
+CREATE TABLE chatbots(
+id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+share_token VARCHAR(100) UNIQUE NOT NULL,
+context_data JSONB,
+is_active BOOLEAN DEFAULT TRUE,
+query_count INTEGER DEFAULT 0,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
