@@ -10,3 +10,18 @@ users(
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CHECK(email IS NOT NULL OR phone IS NOT NULL) 
 );
+
+CREATE TABLE IF NOT EXISTS 
+student_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE,
+    headline VARCHAR(150),
+    bio TEXT,
+    location VARCHAR(150),
+    website VARCHAR(255),
+    linkedin VARCHAR(255),
+    github VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_student_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
