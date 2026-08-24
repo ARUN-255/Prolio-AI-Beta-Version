@@ -2,6 +2,12 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+} = require("../Controllers/Student/projectController");
+const {
   protect,
   authorize,
 } = require("../Middleware/authMiddleware");
@@ -12,7 +18,6 @@ const {
   updateProfile,
 } = require("../Controllers/Student/studentProfileController");
 
-// Student portfolio routes
 router.get(
   "/portfolio",
   protect,
@@ -32,6 +37,34 @@ router.put(
   protect,
   authorize("student"),
   updateProfile
+);
+
+router.get(
+  "/portfolio/projects",
+  protect,
+  authorize("student"),
+  getProjects
+);
+
+router.post(
+  "/portfolio/projects",
+  protect,
+  authorize("student"),
+  createProject
+);
+
+router.put(
+  "/portfolio/projects/:id",
+  protect,
+  authorize("student"),
+  updateProject
+);
+
+router.delete(
+  "/portfolio/projects/:id",
+  protect,
+  authorize("student"),
+  deleteProject
 );
 
 module.exports = router;
