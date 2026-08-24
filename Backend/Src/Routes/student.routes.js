@@ -12,22 +12,23 @@ const {
   updateProfile,
 } = require("../Controllers/Student/studentProfileController");
 
+// Student portfolio routes
 router.get(
-  "/profile",
+  "/portfolio",
   protect,
   authorize("student"),
   getProfile
 );
 
 router.post(
-  "/profile",
+  "/portfolio",
   protect,
   authorize("student"),
   createProfile
 );
 
 router.put(
-  "/profile",
+  "/portfolio",
   protect,
   authorize("student"),
   updateProfile

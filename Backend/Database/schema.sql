@@ -26,17 +26,7 @@ student_profiles (
     CONSTRAINT fk_student_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS student_education(
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    institution VARCHAR(200) NOT NULL,
-    degree VARCHAR(150) NOT NULL,
-    field_of_study VARCHAR(150),
-    start_year INTEGER,
-    end_year INTEGER,
-    grade VARCHAR(50),
-    description TEXT,
-    craeted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_education_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS education JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS skills TEXT[] DEFAULT '{}',
+ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb,
+ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;

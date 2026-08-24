@@ -1,47 +1,37 @@
 const StudentProfile = require("../../Models/StudentProfile");
-
-const getProfile = async (req, res) => {
-  try {
+const getProfile = async (req,res) => {
+  try{
     const profile = await StudentProfile.findByUserId(req.user.id);
-
-    if (!profile) {
-      return res.status(404).json({
+    if(!profile){
+      return res.status(404),json({
         success: false,
         message: "Student profile not found",
       });
     }
-
     return res.status(200).json({
       success: true,
       profile,
     });
-  } catch (error) {
-    console.error("GET STUDENT PROFILE ERROR:", error);
-
+  }
+  catch(error){
+    console.error("GET STUDENT PROFILE ERROR:",error);
     return res.status(500).json({
-      success: false,
-      message: "Internal server error",
+      success:false,
+      message:"Internal server error",
     });
   }
 };
 
-const createProfile = async (req, res) => {
-  try {
-    console.log("REQ USER:", req.user);
-
+const createProfile = async (req,res) => {
+  try{
     const userId = req.user.id;
-
-    console.log("USER ID:", userId);
-
     const existingProfile = await StudentProfile.findByUserId(userId);
-
-    if (existingProfile) {
+    if(existingProfile){
       return res.status(409).json({
-        success: false,
-        message: "Student profile already exists",
+        success:false,
+        message:"Student profile already exists",
       });
     }
-
     const {
       headline,
       bio,
@@ -49,6 +39,10 @@ const createProfile = async (req, res) => {
       website,
       linkedin,
       github,
+      education,
+      skills,
+      socialLinks,
+      isPublic,
     } = req.body;
 
     const profile = await StudentProfile.create({
@@ -56,39 +50,38 @@ const createProfile = async (req, res) => {
       headline,
       bio,
       location,
-      website,
       linkedin,
       github,
+      education,
+      skills,
+      socialLinks,
+      isPublic,
     });
 
     return res.status(201).json({
-      success: true,
-      message: "Student profile created successfully",
+      success:true,
+      message:"Student profile created successfully",
       profile,
     });
-  } catch (error) {
-    console.error("CREATE STUDENT PROFILE ERROR:", error);
-
+  }catch(error){
+    console.error("CREATE STUDENT PROFILE ERROR:",error);
     return res.status(500).json({
-      success: false,
-      message: "Internal server error",
+      success:false,
+      message:"Internal server error",
     });
   }
 };
 
-const updateProfile = async (req, res) => {
-  try {
+const updateProfile = async (req,res) => {
+  try{
     const userId = req.user.id;
-
     const existingProfile = await StudentProfile.findByUserId(userId);
-
-    if (!existingProfile) {
+    if(!existingProfile){
       return res.status(404).json({
-        success: false,
-        message: "Student profile not found",
+        success:false,
+        message:"Student profile not found",
       });
     }
-
     const {
       headline,
       bio,
@@ -96,6 +89,10 @@ const updateProfile = async (req, res) => {
       website,
       linkedin,
       github,
+      education,
+      skills,
+      socialLinks,
+      isPublic,
     } = req.body;
 
     const profile = await StudentProfile.update({
@@ -106,19 +103,20 @@ const updateProfile = async (req, res) => {
       website,
       linkedin,
       github,
+      education,
+      skills,
+      socialLinks,
+      isPublic,
     });
-
     return res.status(200).json({
-      success: true,
-      message: "Student profile updated successfully",
-      profile,
+      success:true,
+      message:"Student profile updated successfully",profile,
     });
-  } catch (error) {
-    console.error("UPDATE STUDENT PROFILE ERROR:", error);
-
+  }catch(error){
+    console.error("UPDATE STUDENT PROFILE ERROR:",error);
     return res.status(500).json({
-      success: false,
-      message: "Internal server error",
+      success:false,
+      message:"Internal server error",
     });
   }
 };
