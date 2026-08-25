@@ -7,6 +7,14 @@ const {
   updateProject,
   deleteProject,
 } = require("../Controllers/Student/projectController");
+
+const{
+  getExperiences,
+    createExperience,
+    updateExperience,
+    deleteExperience,
+} = require("../Controllers/Student/experienceController");
+
 const {
   protect,
   authorize,
@@ -65,6 +73,34 @@ router.delete(
   protect,
   authorize("student"),
   deleteProject
+);
+
+router.get(
+  "/portfolio/experiences",
+  protect,
+  authorize("student"),
+  getExperiences
+);
+
+router.post(
+  "/portfolio/experiences",
+  protect,
+  authorize("student"),
+  createExperience
+);
+
+router.put(
+  "/portfolio/experiences/:id",
+  protect,
+  authorize("student"),
+  updateExperience
+);
+
+router.delete(
+  "/portfolio/experiences/:id",
+  protect,
+  authorize("student"),
+  deleteExperience
 );
 
 module.exports = router;
