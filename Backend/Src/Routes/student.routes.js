@@ -15,6 +15,13 @@ const{
     deleteExperience,
 } = require("../Controllers/Student/experienceController");
 
+const{
+   getEducation,
+    createEducation,
+    updateEducation,
+    deleteEducation,
+} = require("../Controllers/Student/educationController");
+
 const {
   protect,
   authorize,
@@ -101,6 +108,34 @@ router.delete(
   protect,
   authorize("student"),
   deleteExperience
+);
+
+router.get(
+  "/portfolio/education",
+  protect,
+  authorize("student"),
+  getEducation
+);
+
+router.post(
+  "/portfolio/education",
+  protect,
+  authorize("student"),
+  createEducation
+);
+
+router.put(
+  "/portfolio/education/:id",
+  protect,
+  authorize("student"),
+  updateEducation
+);
+
+router.delete(
+  "/portfolio/education/:id",
+  protect,
+  authorize("student"),
+  deleteEducation
 );
 
 module.exports = router;

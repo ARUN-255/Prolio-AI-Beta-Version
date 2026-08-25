@@ -64,3 +64,20 @@ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 CONSTRAINT fk_experiences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS 
+education(
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    institution VARCHAR(200) NOT NULL,
+    degree VARCHAR(200) NOT NULL,
+    field_of_study VARCHAR(200),
+    start_year INTEGER,
+    end_year INTEGER,
+    grade VARCHAR(100),
+    description TEXT,
+    is_public BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_education_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
