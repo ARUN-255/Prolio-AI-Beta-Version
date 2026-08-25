@@ -22,6 +22,13 @@ const{
     deleteEducation,
 } = require("../Controllers/Student/educationController");
 
+const{
+  getSkills,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+} = require("../Controllers/Student/skillController");
+
 const {
   protect,
   authorize,
@@ -136,6 +143,34 @@ router.delete(
   protect,
   authorize("student"),
   deleteEducation
+);
+
+router.get(
+  "/portfolio/skills",
+  protect,
+  authorize("student"),
+  getSkills
+);
+
+router.post(
+  "/portfolio/skills",
+  protect,
+  authorize("student"),
+  createSkill
+);
+
+router.put(
+  "/portfolio/skills/:id",
+  protect,
+  authorize("student"),
+  updateSkill
+);
+
+router.delete(
+  "/portfolio/skills/:id",
+  protect,
+  authorize("student"),
+  deleteSkill
 );
 
 module.exports = router;
