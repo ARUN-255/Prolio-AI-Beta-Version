@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getMyPortfolio,
+} = require("../Controllers/Student/portfolioController");
+
+const {
   getCertificates,
   createCertificate,
   updateCertificate,
@@ -207,6 +211,13 @@ router.delete(
   protect,
   authorize("student"),
   deleteCertificate
+);
+
+router.get(
+  "/portfolio",
+  protect,
+  authorize("student"),
+  getMyPortfolio
 );
 
 module.exports = router;
