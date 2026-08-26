@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./Routes/auth.routes");
 const studentRoutes = require("./Routes/student.routes");
+const publicRoutes = require("./Routes/public.routes");
 
 require("dotenv").config();
 
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/auth",authRoutes);
 app.use("/api/students",studentRoutes);
+app.use("/api/public", publicRoutes);
 
 app.get("/",(req,res)=>{
     res.json({

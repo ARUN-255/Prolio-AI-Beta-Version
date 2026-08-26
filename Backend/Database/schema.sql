@@ -108,3 +108,6 @@ certificates(
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_certificates_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS public_slug VARCHAR(150) UNIQUE;
