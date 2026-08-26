@@ -6,6 +6,10 @@ const {
 } = require("../Controllers/Student/portfolioController");
 
 const {
+  updateSlug,
+} = require("../Controllers/Student/slugController");
+
+const {
   getCertificates,
   createCertificate,
   updateCertificate,
@@ -218,6 +222,13 @@ router.get(
   protect,
   authorize("student"),
   getMyPortfolio
+);
+
+router.put(
+  "/portfolio/slug",
+  protect,
+  authorize("student"),
+  updateSlug
 );
 
 module.exports = router;
