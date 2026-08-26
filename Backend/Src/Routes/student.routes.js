@@ -2,6 +2,13 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  getCertificates,
+  createCertificate,
+  updateCertificate,
+  deleteCertificate,
+} = require("../Controllers/Student/certificateController");
+
+const {
   getProjects,
   createProject,
   updateProject,
@@ -171,6 +178,35 @@ router.delete(
   protect,
   authorize("student"),
   deleteSkill
+);
+
+
+router.get(
+  "/portfolio/certificates",
+  protect,
+  authorize("student"),
+  getCertificates
+);
+
+router.post(
+  "/portfolio/certificates",
+  protect,
+  authorize("student"),
+  createCertificate
+);
+
+router.put(
+  "/portfolio/certificates/:id",
+  protect,
+  authorize("student"),
+  updateCertificate
+);
+
+router.delete(
+  "/portfolio/certificates/:id",
+  protect,
+  authorize("student"),
+  deleteCertificate
 );
 
 module.exports = router;
