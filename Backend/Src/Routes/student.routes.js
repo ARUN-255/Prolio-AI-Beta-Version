@@ -10,6 +10,14 @@ const {
 } = require("../Controllers/Student/slugController");
 
 const {
+  getResumes,
+  getResumeById,
+  createResume,
+  updateResume,
+  deleteResume,
+} = require("../Controllers/Student/resumeController");
+
+const {
   getCertificates,
   createCertificate,
   updateCertificate,
@@ -229,6 +237,43 @@ router.put(
   protect,
   authorize("student"),
   updateSlug
+);
+
+// RESUME ROUTES
+
+router.get(
+  "/resumes",
+  protect,
+  authorize("student"),
+  getResumes
+);
+
+router.get(
+  "/resumes/:id",
+  protect,
+  authorize("student"),
+  getResumeById
+);
+
+router.post(
+  "/resumes",
+  protect,
+  authorize("student"),
+  createResume
+);
+
+router.put(
+  "/resumes/:id",
+  protect,
+  authorize("student"),
+  updateResume
+);
+
+router.delete(
+  "/resumes/:id",
+  protect,
+  authorize("student"),
+  deleteResume
 );
 
 module.exports = router;

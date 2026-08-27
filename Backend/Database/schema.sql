@@ -111,3 +111,24 @@ certificates(
 
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS public_slug VARCHAR(150) UNIQUE;
+
+CREATE TABLE IF NOT EXISTS resumes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+
+    title VARCHAR(200) NOT NULL,
+    template_name VARCHAR(100) DEFAULT 'classic',
+
+    resume_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    is_primary BOOLEAN DEFAULT FALSE,
+    is_public BOOLEAN DEFAULT FALSE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_resumes_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
