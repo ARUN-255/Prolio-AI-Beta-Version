@@ -15,6 +15,7 @@ const {
   createResume,
   updateResume,
   deleteResume,
+  importResumeFromPortfolio,
 } = require("../Controllers/Student/resumeController");
 
 const {
@@ -274,6 +275,13 @@ router.delete(
   protect,
   authorize("student"),
   deleteResume
+);
+
+router.get(
+  "/resumes/import/profile",
+  protect,
+  authorize("student"),
+  importResumeFromPortfolio
 );
 
 module.exports = router;

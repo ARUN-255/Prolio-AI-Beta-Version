@@ -1,4 +1,7 @@
 const Resume = require("../../Models/Resume");
+const {
+  buildResumeDataFromPortfolio,
+} = require("../../Services/resumeService");
 
 // GET ALL RESUMES
 const getResumes = async (req, res) => {
@@ -184,10 +187,33 @@ const deleteResume = async (req, res) => {
   }
 };
 
+// IMPORT / PREVIEW RESUME DATA FROM PORTFOLIO
+const importResumeFromPortfolio = async (req, res) => {
+  try {
+    const resumeData = await buildResumeDataFromPortfolio(
+      req.user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Resume data imported from portfolio successfully",
+      resume_data: resumeData,
+    });
+  } catch (error) {
+    console.error("IMPORT RESUME DATA ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   getResumes,
   getResumeById,
   createResume,
   updateResume,
   deleteResume,
+  importResumeFromPortfolio,
 };
