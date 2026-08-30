@@ -1,4 +1,5 @@
 const express = require("express");
+
 const router = express.Router();
 
 const {
@@ -16,6 +17,11 @@ const {
   updateResume,
   deleteResume,
   importResumeFromPortfolio,
+  updateResumeData,
+  updateResumeSection,
+  deleteResumeSection,
+  generateResumePdfFile,
+  getResumePdfUrl,
 } = require("../Controllers/Student/resumeController");
 
 const {
@@ -32,21 +38,21 @@ const {
   deleteProject,
 } = require("../Controllers/Student/projectController");
 
-const{
+const {
   getExperiences,
-    createExperience,
-    updateExperience,
-    deleteExperience,
+  createExperience,
+  updateExperience,
+  deleteExperience,
 } = require("../Controllers/Student/experienceController");
 
-const{
-   getEducation,
-    createEducation,
-    updateEducation,
-    deleteEducation,
+const {
+  getEducation,
+  createEducation,
+  updateEducation,
+  deleteEducation,
 } = require("../Controllers/Student/educationController");
 
-const{
+const {
   getSkills,
   createSkill,
   updateSkill,
@@ -64,6 +70,8 @@ const {
   updateProfile,
 } = require("../Controllers/Student/studentProfileController");
 
+
+// PROFILE ROUTES
 router.get(
   "/portfolio",
   protect,
@@ -85,6 +93,8 @@ router.put(
   updateProfile
 );
 
+
+// PROJECT ROUTES
 router.get(
   "/portfolio/projects",
   protect,
@@ -113,6 +123,8 @@ router.delete(
   deleteProject
 );
 
+
+// EXPERIENCE ROUTES
 router.get(
   "/portfolio/experiences",
   protect,
@@ -141,6 +153,8 @@ router.delete(
   deleteExperience
 );
 
+
+// EDUCATION ROUTES
 router.get(
   "/portfolio/education",
   protect,
@@ -169,6 +183,8 @@ router.delete(
   deleteEducation
 );
 
+
+// SKILL ROUTES
 router.get(
   "/portfolio/skills",
   protect,
@@ -198,6 +214,7 @@ router.delete(
 );
 
 
+// CERTIFICATE ROUTES
 router.get(
   "/portfolio/certificates",
   protect,
@@ -226,13 +243,17 @@ router.delete(
   deleteCertificate
 );
 
+
+// COMPLETE PORTFOLIO
 router.get(
-  "/portfolio",
+  "/portfolio/all",
   protect,
   authorize("student"),
   getMyPortfolio
 );
 
+
+// PORTFOLIO SLUG
 router.put(
   "/portfolio/slug",
   protect,
@@ -240,13 +261,20 @@ router.put(
   updateSlug
 );
 
-// RESUME ROUTES
 
+// RESUME ROUTES
 router.get(
   "/resumes",
   protect,
   authorize("student"),
   getResumes
+);
+
+router.get(
+  "/resumes/import/profile",
+  protect,
+  authorize("student"),
+  importResumeFromPortfolio
 );
 
 router.get(
@@ -277,11 +305,48 @@ router.delete(
   deleteResume
 );
 
-router.get(
-  "/resumes/import/profile",
+
+// RESUME DATA
+router.put(
+  "/resume/:id/data",
   protect,
   authorize("student"),
-  importResumeFromPortfolio
+  updateResumeData
 );
+
+
+// RESUME SECTION
+router.put(
+  "/resume/:id/section",
+  protect,
+  authorize("student"),
+  updateResumeSection
+);
+
+router.delete(
+  "/resume/:id/section/:sectionName",
+  protect,
+  authorize("student"),
+  deleteResumeSection
+);
+
+
+// GENERATE PDF
+router.post(
+  "/resume/:id/generate-pdf",
+  protect,
+  authorize("student"),
+  generateResumePdfFile
+);
+
+
+// GET SECURE PDF URL
+router.get(
+  "/resume/:id/pdf-url",
+  protect,
+  authorize("student"),
+  getResumePdfUrl
+);
+
 
 module.exports = router;
