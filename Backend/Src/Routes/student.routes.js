@@ -1,7 +1,12 @@
 const express = require("express");
 
 const router = express.Router();
-
+const {
+  runAtsAnalysis,
+  getAtsAnalyses,
+  getAtsAnalysisById,
+  deleteAtsAnalysis,
+} = require("../Controllers/Student/atsController");
 const {
   getMyPortfolio,
 } = require("../Controllers/Student/portfolioController");
@@ -348,5 +353,33 @@ router.get(
   getResumePdfUrl
 );
 
+// ATS ROUTES
+router.post(
+  "/ats/analyze",
+  protect,
+  authorize("student"),
+  runAtsAnalysis
+);
+
+router.get(
+  "/ats",
+  protect,
+  authorize("student"),
+  getAtsAnalyses
+);
+
+router.get(
+  "/ats/:id",
+  protect,
+  authorize("student"),
+  getAtsAnalysisById
+);
+
+router.delete(
+  "/ats/:id",
+  protect,
+  authorize("student"),
+  deleteAtsAnalysis
+);
 
 module.exports = router;

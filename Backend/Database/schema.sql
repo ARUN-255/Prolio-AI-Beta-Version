@@ -132,3 +132,48 @@ CREATE TABLE IF NOT EXISTS resumes (
         REFERENCES users(id)
         ON DELETE CASCADE
 );
+
+-- ============================================
+-- ATS ANALYSIS
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS ats_analyses (
+    id SERIAL PRIMARY KEY,
+
+    user_id INTEGER NOT NULL,
+    resume_id INTEGER NOT NULL,
+
+    job_title VARCHAR(200),
+    job_description TEXT NOT NULL,
+
+    ats_score INTEGER,
+
+    matched_keywords JSONB DEFAULT '[]'::jsonb,
+    missing_keywords JSONB DEFAULT '[]'::jsonb,
+    matched_skills JSONB DEFAULT '[]'::jsonb,
+    missing_skills JSONB DEFAULT '[]'::jsonb,
+
+    strengths JSONB DEFAULT '[]'::jsonb,
+    improvements JSONB DEFAULT '[]'::jsonb,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_ats_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_ats_resume
+        FOREIGN KEY (resume_id)
+        REFERENCES resumes(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT chk_ats_score
+        CHECK (
+            ats_score IS NULL
+            OR (ats_score >= 0 AND ats_score <= 100)
+        )
+);
+
+ALTER TABLE ats_analyses
+ADD COLUMN IF NOT EXISTS ai_feedback JSONB DEFAULT NULL;
