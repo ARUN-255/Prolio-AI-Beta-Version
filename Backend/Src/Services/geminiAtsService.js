@@ -10,7 +10,7 @@ const getAiAtsFeedback = async ({
   jobDescription,
 }) => {
   const response = await ai.models.generateContent({
-    model: "gemini-3.6-flash ",
+    model: "gemini-3.6-flash",
 
     contents: `
 You are an ATS resume analysis assistant.
