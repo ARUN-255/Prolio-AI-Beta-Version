@@ -179,6 +179,48 @@ async updatePdfUrl(id, userId, pdfUrl) {
   return result.rows[0];
 },
 
+// GET ONE PUBLIC RESUME BY ID
+async findPublicById(id) {
+  const result = await pool.query(
+    `SELECT
+      id,
+      user_id,
+      title,
+      template_name,
+      resume_data,
+      is_primary,
+      is_public,
+      pdf_url,
+      created_at,
+      updated_at
+     FROM resumes
+     WHERE id = $1
+     AND is_public = true`,
+    [id]
+  );
+
+  return result.rows[0];
+},
+
+// UPDATE RESUME PUBLIC VISIBILITY
+async updateVisibility(id, userId, isPublic) {
+  const result = await pool.query(
+    `UPDATE resumes
+     SET is_public = $1,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2
+     AND user_id = $3
+     RETURNING *`,
+    [
+      isPublic,
+      id,
+      userId
+    ]
+  );
+
+  return result.rows[0];
+},
+
   // REMOVE PRIMARY FLAG FROM OTHER RESUMES
   async clearPrimary(userId, excludeId = null) {
     if (excludeId) {

@@ -118,6 +118,25 @@ const User = {
     return result.rows[0];
   },
 
+  // FIND ALL STUDENT USERS
+async findAllStudents() {
+  const result = await pool.query(
+    `SELECT
+      id,
+      name,
+      email,
+      phone,
+      role,
+      public_slug,
+      created_at,
+      updated_at
+     FROM users
+     WHERE role = 'student'
+     ORDER BY id DESC`
+  );
+
+  return result.rows;
+},
 
   // UPDATE PUBLIC PORTFOLIO SLUG
   async updatePublicSlug(userId, slug) {

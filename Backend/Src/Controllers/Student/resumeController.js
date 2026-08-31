@@ -525,6 +525,59 @@ const getResumePdfUrl = async (req, res) => {
   }
 };
 
+// UPDATE RESUME PUBLIC VISIBILITY
+const updateResumeVisibility = async (req, res) => {
+  try {
+    const resumeId = req.params.id;
+    const userId = req.user.id;
+    const { is_public } = req.body;
+
+    if (typeof is_public !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "is_public must be true or false",
+      });
+    }
+
+    const existingResume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        userId
+      );
+
+    if (!existingResume) {
+      return res.status(404).json({
+        success: false,
+        message: "Resume not found",
+      });
+    }
+
+    const resume =
+      await Resume.updateVisibility(
+        resumeId,
+        userId,
+        is_public
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: is_public
+        ? "Resume is now public"
+        : "Resume is now private",
+      resume,
+    });
+  } catch (error) {
+    console.error(
+      "UPDATE RESUME VISIBILITY ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
 
 module.exports = {
   getResumes,
@@ -538,4 +591,5 @@ module.exports = {
   deleteResumeSection,
   generateResumePdfFile,
   getResumePdfUrl,
+  updateResumeVisibility,
 };

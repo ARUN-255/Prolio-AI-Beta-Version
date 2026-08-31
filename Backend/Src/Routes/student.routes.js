@@ -27,6 +27,7 @@ const {
   deleteResumeSection,
   generateResumePdfFile,
   getResumePdfUrl,
+  updateResumeVisibility,
 } = require("../Controllers/Student/resumeController");
 
 const {
@@ -310,6 +311,12 @@ router.delete(
   deleteResume
 );
 
+router.patch(
+  "/resumes/:id/visibility",
+  protect,
+  authorize("student"),
+  updateResumeVisibility
+);
 
 // RESUME DATA
 router.put(
