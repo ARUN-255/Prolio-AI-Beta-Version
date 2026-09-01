@@ -6,7 +6,23 @@ const Education = require("../Models/Education");
 const Skill = require("../Models/Skill");
 const Certificate = require("../Models/Certificate");
 
+const {
+  redisClient,
+} = require("../Config/redis");
+
 const buildPublicPortfolio = async (slug) => {
+  const cacheKey = `public-portfolio:${slug}`;
+
+  // CHECK REDIS CACHE FIRST
+  if (redisClient.isReady) {
+    const cachedPortfolio =
+      await redisClient.get(cacheKey);
+
+    if (cachedPortfolio) {
+      return JSON.parse(cachedPortfolio);
+    }
+  }
+
   const user = await User.findBySlug(slug);
 
   if (!user || user.role !== "student") {
@@ -85,7 +101,7 @@ const buildPublicPortfolio = async (slug) => {
       file_url: certificate.file_url,
     }));
 
-  return {
+  const portfolio = {
     user: {
       name: user.name,
       public_slug: user.public_slug,
@@ -109,6 +125,19 @@ const buildPublicPortfolio = async (slug) => {
     skills: publicSkills,
     certificates: publicCertificates,
   };
+
+  // STORE IN REDIS FOR 5 MINUTES
+  if (redisClient.isReady) {
+    await redisClient.set(
+      cacheKey,
+      JSON.stringify(portfolio),
+      {
+        EX: 300,
+      }
+    );
+  }
+
+  return portfolio;
 };
 
 module.exports = {
