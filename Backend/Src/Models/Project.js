@@ -12,6 +12,20 @@ const Project = {
         );
         return result.rows[0];
     },
+
+    // FIND ONE PUBLIC PROJECT BY ID
+async findPublicById(id) {
+    const result = await pool.query(
+        `SELECT *
+         FROM projects
+         WHERE id = $1
+         AND is_public = true`,
+        [id]
+    );
+
+    return result.rows[0];
+},
+
     async create({
         userId,
         title,

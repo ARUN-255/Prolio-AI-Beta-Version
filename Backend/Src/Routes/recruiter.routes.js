@@ -17,6 +17,10 @@ const {
   comparePublicResumes,
 } = require("../Controllers/Recruiter/comparisonController");
 
+const {
+  analyzePublicProject,
+} = require("../Controllers/Recruiter/projectAnalyzerController");
+
 router.get(
   "/candidates/search",
   protect,
@@ -43,6 +47,13 @@ router.get(
   protect,
   authorize("recruiter"),
   getPublicResume
+);
+
+router.post(
+  "/projects/:id/analyze",
+  protect,
+  authorize("recruiter"),
+  analyzePublicProject
 );
 
 module.exports = router;
