@@ -1,0 +1,14 @@
+{
+  "name": "prolio-ai-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Prolio AI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "dotenv": "^17.4.2",
+    "zod": "^3.25.76"
+  }
+}

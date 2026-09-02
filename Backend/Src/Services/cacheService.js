@@ -4,6 +4,19 @@ const {
 
 const User = require("../Models/User");
 
+// CLEAR CACHE DIRECTLY BY SLUG
+const clearPublicPortfolioCache = async (slug) => {
+  if (!slug || !redisClient.isReady) {
+    return;
+  }
+
+  const cacheKey =
+    `public-portfolio:${slug}`;
+
+  await redisClient.del(cacheKey);
+};
+
+// CLEAR CACHE USING USER ID
 const clearPublicPortfolioCacheByUserId = async (
   userId
 ) => {
@@ -17,12 +30,12 @@ const clearPublicPortfolioCacheByUserId = async (
     return;
   }
 
-  const cacheKey =
-    `public-portfolio:${user.public_slug}`;
-
-  await redisClient.del(cacheKey);
+  await clearPublicPortfolioCache(
+    user.public_slug
+  );
 };
 
 module.exports = {
+  clearPublicPortfolioCache,
   clearPublicPortfolioCacheByUserId,
 };
