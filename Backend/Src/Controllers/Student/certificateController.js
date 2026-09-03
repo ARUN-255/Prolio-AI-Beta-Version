@@ -4,6 +4,11 @@ const {
   clearPublicPortfolioCacheByUserId,
 } = require("../../Services/cacheService");
 
+const quotaService = require(
+  "../../Services/quotaService"
+);
+
+
 // GET ALL CERTIFICATES
 const getCertificates = async (req, res) => {
   try {
@@ -29,9 +34,15 @@ const getCertificates = async (req, res) => {
   }
 };
 
+
 // CREATE CERTIFICATE
-const createCertificate = async (req, res) => {
+const createCertificate = async (
+  req,
+  res
+) => {
   try {
+    const userId = req.user.id;
+
     const {
       title,
       issuer,
@@ -48,9 +59,53 @@ const createCertificate = async (req, res) => {
       });
     }
 
+    // -------------------------
+    // CHECK CERTIFICATE LIMIT
+    // -------------------------
+
+    const certificateLimit =
+      await quotaService.getLimit(
+        userId,
+        "certificates_max"
+      );
+
+    if (certificateLimit === undefined) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Certificates are not available for this plan",
+      });
+    }
+
+    const existingCertificates =
+      await Certificate.findAllByUserId(
+        userId
+      );
+
+    // null = unlimited
+    if (
+      certificateLimit !== null &&
+      existingCertificates.length >=
+        Number(certificateLimit)
+    ) {
+      return res.status(429).json({
+        success: false,
+        message:
+          "Maximum certificate limit reached",
+        quota: "certificates_max",
+        used: existingCertificates.length,
+        limit: Number(certificateLimit),
+        remaining: 0,
+      });
+    }
+
+    // -------------------------
+    // CREATE CERTIFICATE
+    // -------------------------
+
     const certificate =
       await Certificate.create({
-        userId: req.user.id,
+        userId,
         title,
         issuer,
         date,
@@ -59,14 +114,37 @@ const createCertificate = async (req, res) => {
       });
 
     await clearPublicPortfolioCacheByUserId(
-      req.user.id
+      userId
     );
+
+    const used =
+      existingCertificates.length + 1;
 
     return res.status(201).json({
       success: true,
       message:
         "Certificate created successfully",
       certificate,
+
+      quota: {
+        used,
+        limit:
+          certificateLimit === null
+            ? null
+            : Number(certificateLimit),
+
+        remaining:
+          certificateLimit === null
+            ? null
+            : Math.max(
+                Number(certificateLimit) -
+                  used,
+                0
+              ),
+
+        unlimited:
+          certificateLimit === null,
+      },
     });
   } catch (error) {
     console.error(
@@ -81,10 +159,15 @@ const createCertificate = async (req, res) => {
   }
 };
 
+
 // UPDATE CERTIFICATE
-const updateCertificate = async (req, res) => {
+const updateCertificate = async (
+  req,
+  res
+) => {
   try {
-    const certificateId = req.params.id;
+    const certificateId =
+      req.params.id;
 
     const existingCertificate =
       await Certificate.findByIdAndUserId(
@@ -150,8 +233,12 @@ const updateCertificate = async (req, res) => {
   }
 };
 
+
 // DELETE CERTIFICATE
-const deleteCertificate = async (req, res) => {
+const deleteCertificate = async (
+  req,
+  res
+) => {
   try {
     const certificate =
       await Certificate.delete(
@@ -184,6 +271,7 @@ const deleteCertificate = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   getCertificates,

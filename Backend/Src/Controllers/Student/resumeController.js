@@ -16,18 +16,28 @@ const {
   deleteResumePdf,
 } = require("../../Services/s3Service");
 
+const quotaService = require(
+  "../../Services/quotaService"
+);
+
 
 // GET ALL RESUMES
 const getResumes = async (req, res) => {
   try {
-    const resumes = await Resume.findAllByUserId(req.user.id);
+    const resumes =
+      await Resume.findAllByUserId(
+        req.user.id
+      );
 
     return res.status(200).json({
       success: true,
       resumes,
     });
   } catch (error) {
-    console.error("GET RESUMES ERROR:", error);
+    console.error(
+      "GET RESUMES ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -38,12 +48,16 @@ const getResumes = async (req, res) => {
 
 
 // GET ONE RESUME
-const getResumeById = async (req, res) => {
+const getResumeById = async (
+  req,
+  res
+) => {
   try {
-    const resume = await Resume.findByIdAndUserId(
-      req.params.id,
-      req.user.id
-    );
+    const resume =
+      await Resume.findByIdAndUserId(
+        req.params.id,
+        req.user.id
+      );
 
     if (!resume) {
       return res.status(404).json({
@@ -57,7 +71,10 @@ const getResumeById = async (req, res) => {
       resume,
     });
   } catch (error) {
-    console.error("GET RESUME ERROR:", error);
+    console.error(
+      "GET RESUME ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -68,8 +85,13 @@ const getResumeById = async (req, res) => {
 
 
 // CREATE RESUME
-const createResume = async (req, res) => {
+const createResume = async (
+  req,
+  res
+) => {
   try {
+    const userId = req.user.id;
+
     const {
       title,
       template_name,
@@ -81,30 +103,88 @@ const createResume = async (req, res) => {
     if (!title) {
       return res.status(400).json({
         success: false,
-        message: "Resume title is required",
+        message:
+          "Resume title is required",
+      });
+    }
+
+    // -------------------------
+    // CHECK RESUME QUOTA
+    // -------------------------
+
+    const quota =
+      await quotaService.checkQuota(
+        userId,
+        "resumes_per_month"
+      );
+
+    if (!quota.allowed) {
+      return res.status(429).json({
+        success: false,
+        message:
+          "Monthly resume creation limit reached",
+        quota: "resumes_per_month",
+        used: quota.used,
+        limit: quota.limit,
+        remaining: quota.remaining,
       });
     }
 
     if (is_primary === true) {
-      await Resume.clearPrimary(req.user.id);
+      await Resume.clearPrimary(
+        userId
+      );
     }
 
-    const resume = await Resume.create({
-      userId: req.user.id,
-      title,
-      templateName: template_name,
-      resumeData: resume_data,
-      isPrimary: is_primary,
-      isPublic: is_public,
-    });
+    // -------------------------
+    // CREATE RESUME
+    // -------------------------
+
+    const resume =
+      await Resume.create({
+        userId,
+        title,
+        templateName:
+          template_name,
+        resumeData:
+          resume_data,
+        isPrimary:
+          is_primary,
+        isPublic:
+          is_public,
+      });
+
+    // -------------------------
+    // CONSUME QUOTA
+    // Only after creation succeeds
+    // -------------------------
+
+    const quotaUsage =
+      await quotaService.consumeQuota(
+        userId,
+        "resumes_per_month"
+      );
 
     return res.status(201).json({
       success: true,
-      message: "Resume created successfully",
+      message:
+        "Resume created successfully",
       resume,
+
+      quota: {
+        used: quotaUsage.used,
+        limit: quotaUsage.limit,
+        remaining:
+          quotaUsage.remaining,
+        unlimited:
+          quotaUsage.unlimited,
+      },
     });
   } catch (error) {
-    console.error("CREATE RESUME ERROR:", error);
+    console.error(
+      "CREATE RESUME ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -115,14 +195,18 @@ const createResume = async (req, res) => {
 
 
 // UPDATE RESUME
-const updateResume = async (req, res) => {
+const updateResume = async (
+  req,
+  res
+) => {
   try {
     const resumeId = req.params.id;
 
-    const existingResume = await Resume.findByIdAndUserId(
-      resumeId,
-      req.user.id
-    );
+    const existingResume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        req.user.id
+      );
 
     if (!existingResume) {
       return res.status(404).json({
@@ -142,7 +226,8 @@ const updateResume = async (req, res) => {
     if (!title) {
       return res.status(400).json({
         success: false,
-        message: "Resume title is required",
+        message:
+          "Resume title is required",
       });
     }
 
@@ -153,23 +238,32 @@ const updateResume = async (req, res) => {
       );
     }
 
-    const resume = await Resume.update({
-      id: resumeId,
-      userId: req.user.id,
-      title,
-      templateName: template_name,
-      resumeData: resume_data,
-      isPrimary: is_primary,
-      isPublic: is_public,
-    });
+    const resume =
+      await Resume.update({
+        id: resumeId,
+        userId: req.user.id,
+        title,
+        templateName:
+          template_name,
+        resumeData:
+          resume_data,
+        isPrimary:
+          is_primary,
+        isPublic:
+          is_public,
+      });
 
     return res.status(200).json({
       success: true,
-      message: "Resume updated successfully",
+      message:
+        "Resume updated successfully",
       resume,
     });
   } catch (error) {
-    console.error("UPDATE RESUME ERROR:", error);
+    console.error(
+      "UPDATE RESUME ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -180,15 +274,22 @@ const updateResume = async (req, res) => {
 
 
 // DELETE RESUME
-const deleteResume = async (req, res) => {
+const deleteResume = async (
+  req,
+  res
+) => {
   try {
-    const resumeId = req.params.id;
-    const userId = req.user.id;
+    const resumeId =
+      req.params.id;
 
-    const existingResume = await Resume.findByIdAndUserId(
-      resumeId,
-      userId
-    );
+    const userId =
+      req.user.id;
+
+    const existingResume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        userId
+      );
 
     if (!existingResume) {
       return res.status(404).json({
@@ -197,12 +298,12 @@ const deleteResume = async (req, res) => {
       });
     }
 
-    // Delete PDF from S3 if it exists
     if (existingResume.pdf_url) {
-      await deleteResumePdf(existingResume.pdf_url);
+      await deleteResumePdf(
+        existingResume.pdf_url
+      );
     }
 
-    // Delete resume from PostgreSQL
     await Resume.delete(
       resumeId,
       userId
@@ -210,7 +311,10 @@ const deleteResume = async (req, res) => {
 
     return res.status(204).send();
   } catch (error) {
-    console.error("DELETE RESUME ERROR:", error);
+    console.error(
+      "DELETE RESUME ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -221,19 +325,27 @@ const deleteResume = async (req, res) => {
 
 
 // IMPORT RESUME DATA FROM PORTFOLIO
-const importResumeFromPortfolio = async (req, res) => {
+const importResumeFromPortfolio = async (
+  req,
+  res
+) => {
   try {
-    const resumeData = await buildResumeDataFromPortfolio(
-      req.user.id
-    );
+    const resumeData =
+      await buildResumeDataFromPortfolio(
+        req.user.id
+      );
 
     return res.status(200).json({
       success: true,
-      message: "Resume data imported from portfolio successfully",
+      message:
+        "Resume data imported from portfolio successfully",
       resume_data: resumeData,
     });
   } catch (error) {
-    console.error("IMPORT RESUME DATA ERROR:", error);
+    console.error(
+      "IMPORT RESUME DATA ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -244,15 +356,23 @@ const importResumeFromPortfolio = async (req, res) => {
 
 
 // UPDATE COMPLETE RESUME DATA
-const updateResumeData = async (req, res) => {
+const updateResumeData = async (
+  req,
+  res
+) => {
   try {
-    const resumeId = req.params.id;
-    const { resume_data } = req.body;
+    const resumeId =
+      req.params.id;
 
-    const existingResume = await Resume.findByIdAndUserId(
-      resumeId,
-      req.user.id
-    );
+    const {
+      resume_data,
+    } = req.body;
+
+    const existingResume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        req.user.id
+      );
 
     if (!existingResume) {
       return res.status(404).json({
@@ -261,26 +381,34 @@ const updateResumeData = async (req, res) => {
       });
     }
 
-    if (resume_data === undefined) {
+    if (
+      resume_data === undefined
+    ) {
       return res.status(400).json({
         success: false,
-        message: "resume_data is required",
+        message:
+          "resume_data is required",
       });
     }
 
-    const resume = await Resume.updateResumeData(
-      resumeId,
-      req.user.id,
-      resume_data
-    );
+    const resume =
+      await Resume.updateResumeData(
+        resumeId,
+        req.user.id,
+        resume_data
+      );
 
     return res.status(200).json({
       success: true,
-      message: "Resume data updated successfully",
+      message:
+        "Resume data updated successfully",
       resume,
     });
   } catch (error) {
-    console.error("UPDATE RESUME DATA ERROR:", error);
+    console.error(
+      "UPDATE RESUME DATA ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -291,9 +419,13 @@ const updateResumeData = async (req, res) => {
 
 
 // UPDATE ONE RESUME SECTION
-const updateResumeSection = async (req, res) => {
+const updateResumeSection = async (
+  req,
+  res
+) => {
   try {
-    const resumeId = req.params.id;
+    const resumeId =
+      req.params.id;
 
     const {
       section_name,
@@ -303,21 +435,26 @@ const updateResumeSection = async (req, res) => {
     if (!section_name) {
       return res.status(400).json({
         success: false,
-        message: "section_name is required",
+        message:
+          "section_name is required",
       });
     }
 
-    if (section_data === undefined) {
+    if (
+      section_data === undefined
+    ) {
       return res.status(400).json({
         success: false,
-        message: "section_data is required",
+        message:
+          "section_data is required",
       });
     }
 
-    const existingResume = await Resume.findByIdAndUserId(
-      resumeId,
-      req.user.id
-    );
+    const existingResume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        req.user.id
+      );
 
     if (!existingResume) {
       return res.status(404).json({
@@ -326,20 +463,25 @@ const updateResumeSection = async (req, res) => {
       });
     }
 
-    const resume = await Resume.updateSection(
-      resumeId,
-      req.user.id,
-      section_name,
-      section_data
-    );
+    const resume =
+      await Resume.updateSection(
+        resumeId,
+        req.user.id,
+        section_name,
+        section_data
+      );
 
     return res.status(200).json({
       success: true,
-      message: "Resume section updated successfully",
+      message:
+        "Resume section updated successfully",
       resume,
     });
   } catch (error) {
-    console.error("UPDATE RESUME SECTION ERROR:", error);
+    console.error(
+      "UPDATE RESUME SECTION ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -350,15 +492,22 @@ const updateResumeSection = async (req, res) => {
 
 
 // DELETE ONE RESUME SECTION
-const deleteResumeSection = async (req, res) => {
+const deleteResumeSection = async (
+  req,
+  res
+) => {
   try {
-    const resumeId = req.params.id;
-    const sectionName = req.params.sectionName;
+    const resumeId =
+      req.params.id;
 
-    const existingResume = await Resume.findByIdAndUserId(
-      resumeId,
-      req.user.id
-    );
+    const sectionName =
+      req.params.sectionName;
+
+    const existingResume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        req.user.id
+      );
 
     if (!existingResume) {
       return res.status(404).json({
@@ -376,23 +525,29 @@ const deleteResumeSection = async (req, res) => {
     ) {
       return res.status(404).json({
         success: false,
-        message: "Resume section not found",
+        message:
+          "Resume section not found",
       });
     }
 
-    const resume = await Resume.deleteSection(
-      resumeId,
-      req.user.id,
-      sectionName
-    );
+    const resume =
+      await Resume.deleteSection(
+        resumeId,
+        req.user.id,
+        sectionName
+      );
 
     return res.status(200).json({
       success: true,
-      message: "Resume section deleted successfully",
+      message:
+        "Resume section deleted successfully",
       resume,
     });
   } catch (error) {
-    console.error("DELETE RESUME SECTION ERROR:", error);
+    console.error(
+      "DELETE RESUME SECTION ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -403,17 +558,24 @@ const deleteResumeSection = async (req, res) => {
 
 
 // GENERATE RESUME PDF AND UPLOAD TO S3
-const generateResumePdfFile = async (req, res) => {
+const generateResumePdfFile = async (
+  req,
+  res
+) => {
   let generatedPdf;
 
   try {
-    const resumeId = req.params.id;
-    const userId = req.user.id;
+    const resumeId =
+      req.params.id;
 
-    const resume = await Resume.findByIdAndUserId(
-      resumeId,
-      userId
-    );
+    const userId =
+      req.user.id;
+
+    const resume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        userId
+      );
 
     if (!resume) {
       return res.status(404).json({
@@ -422,49 +584,63 @@ const generateResumePdfFile = async (req, res) => {
       });
     }
 
-    // Generate PDF locally
-    generatedPdf = await generateResumePdf(resume);
+    generatedPdf =
+      await generateResumePdf(
+        resume
+      );
 
-    // Upload PDF to S3
-    const uploadedPdf = await uploadResumePdf(
-      generatedPdf.filePath,
-      userId,
-      resumeId
-    );
+    const uploadedPdf =
+      await uploadResumePdf(
+        generatedPdf.filePath,
+        userId,
+        resumeId
+      );
 
-    // Save S3 key in PostgreSQL
-    const updatedResume = await Resume.updatePdfUrl(
-      resumeId,
-      userId,
-      uploadedPdf.key
-    );
+    const updatedResume =
+      await Resume.updatePdfUrl(
+        resumeId,
+        userId,
+        uploadedPdf.key
+      );
 
-    // Delete local temporary PDF
     if (
       generatedPdf.filePath &&
-      fs.existsSync(generatedPdf.filePath)
+      fs.existsSync(
+        generatedPdf.filePath
+      )
     ) {
-      fs.unlinkSync(generatedPdf.filePath);
+      fs.unlinkSync(
+        generatedPdf.filePath
+      );
     }
 
     return res.status(200).json({
       success: true,
-      message: "Resume PDF generated and uploaded successfully",
+      message:
+        "Resume PDF generated and uploaded successfully",
       s3_key: uploadedPdf.key,
       resume: updatedResume,
     });
   } catch (error) {
-    console.error("GENERATE RESUME PDF ERROR:", error);
+    console.error(
+      "GENERATE RESUME PDF ERROR:",
+      error
+    );
 
-    // Also attempt cleanup if something fails after PDF generation
     if (
       generatedPdf &&
       generatedPdf.filePath &&
-      fs.existsSync(generatedPdf.filePath)
+      fs.existsSync(
+        generatedPdf.filePath
+      )
     ) {
       try {
-        fs.unlinkSync(generatedPdf.filePath);
-      } catch (cleanupError) {
+        fs.unlinkSync(
+          generatedPdf.filePath
+        );
+      } catch (
+        cleanupError
+      ) {
         console.error(
           "LOCAL PDF CLEANUP ERROR:",
           cleanupError
@@ -481,15 +657,22 @@ const generateResumePdfFile = async (req, res) => {
 
 
 // GET TEMPORARY SECURE PDF URL
-const getResumePdfUrl = async (req, res) => {
+const getResumePdfUrl = async (
+  req,
+  res
+) => {
   try {
-    const resumeId = req.params.id;
-    const userId = req.user.id;
+    const resumeId =
+      req.params.id;
 
-    const resume = await Resume.findByIdAndUserId(
-      resumeId,
-      userId
-    );
+    const userId =
+      req.user.id;
+
+    const resume =
+      await Resume.findByIdAndUserId(
+        resumeId,
+        userId
+      );
 
     if (!resume) {
       return res.status(404).json({
@@ -501,22 +684,28 @@ const getResumePdfUrl = async (req, res) => {
     if (!resume.pdf_url) {
       return res.status(404).json({
         success: false,
-        message: "Resume PDF has not been generated yet",
+        message:
+          "Resume PDF has not been generated yet",
       });
     }
 
-    const signedUrl = await getResumePdfSignedUrl(
-      resume.pdf_url
-    );
+    const signedUrl =
+      await getResumePdfSignedUrl(
+        resume.pdf_url
+      );
 
     return res.status(200).json({
       success: true,
-      message: "Secure resume PDF URL generated successfully",
+      message:
+        "Secure resume PDF URL generated successfully",
       pdf_url: signedUrl,
       expires_in: 300,
     });
   } catch (error) {
-    console.error("GET RESUME PDF URL ERROR:", error);
+    console.error(
+      "GET RESUME PDF URL ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -525,17 +714,30 @@ const getResumePdfUrl = async (req, res) => {
   }
 };
 
-// UPDATE RESUME PUBLIC VISIBILITY
-const updateResumeVisibility = async (req, res) => {
-  try {
-    const resumeId = req.params.id;
-    const userId = req.user.id;
-    const { is_public } = req.body;
 
-    if (typeof is_public !== "boolean") {
+// UPDATE RESUME PUBLIC VISIBILITY
+const updateResumeVisibility = async (
+  req,
+  res
+) => {
+  try {
+    const resumeId =
+      req.params.id;
+
+    const userId =
+      req.user.id;
+
+    const {
+      is_public,
+    } = req.body;
+
+    if (
+      typeof is_public !== "boolean"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "is_public must be true or false",
+        message:
+          "is_public must be true or false",
       });
     }
 
@@ -578,6 +780,7 @@ const updateResumeVisibility = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   getResumes,

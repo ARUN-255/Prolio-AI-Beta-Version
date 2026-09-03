@@ -177,3 +177,120 @@ CREATE TABLE IF NOT EXISTS ats_analyses (
 
 ALTER TABLE ats_analyses
 ADD COLUMN IF NOT EXISTS ai_feedback JSONB DEFAULT NULL;
+
+
+CREATE TABLE IF NOT EXISTS plans (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('student', 'recruiter')),
+    price_monthly DECIMAL(10,2),
+    price_yearly DECIMAL(10,2),
+    limits JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan_id INTEGER NOT NULL REFERENCES plans(id),
+    billing_cycle VARCHAR(20) CHECK (
+        billing_cycle IN ('monthly', 'yearly')
+    ),
+    auto_pay BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(20) NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'cancelled', 'expired')),
+    razorpay_subscription_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO plans
+(name, role, price_monthly, price_yearly, limits)
+VALUES
+
+(
+    'Student Free',
+    'student',
+    0,
+    0,
+    '{
+        "portfolios": 1,
+        "resumes_per_month": 3,
+        "resume_templates": 6,
+        "portfolio_templates": 3,
+        "certificates_max": 5,
+        "projects_max": 2,
+        "chatbot_questions_per_month": 40,
+        "chatbot_questions_per_visitor": 5,
+        "ats_checks_per_month": 2,
+        "resume_watermark": false,
+        "portfolio_watermark": true,
+        "custom_domain": false,
+        "custom_link": false
+    }'::jsonb
+),
+
+(
+    'Student Pro',
+    'student',
+    89,
+    699,
+    '{
+        "portfolios_per_month": 10,
+        "resumes_per_month": 10,
+        "resume_templates": "all",
+        "portfolio_templates": "all",
+        "certificates_max": null,
+        "projects_max": null,
+        "chatbot_questions_per_month": 300,
+        "chatbot_questions_per_visitor": 50,
+        "ats_checks_per_month": 10,
+        "resume_watermark": false,
+        "portfolio_watermark": false,
+        "custom_domain": true,
+        "custom_link": true
+    }'::jsonb
+),
+
+(
+    'Recruiter Free',
+    'recruiter',
+    0,
+    0,
+    '{
+        "job_posts_per_month": 3,
+        "invitations_per_month": 30,
+        "comparison_batch_size": 3,
+        "comparisons_per_day": 10,
+        "resume_downloads_per_month": 30
+    }'::jsonb
+),
+
+(
+    'Recruiter Pro',
+    'recruiter',
+    149,
+    999,
+    '{
+        "job_posts_per_month": null,
+        "invitations_per_month": null,
+        "comparison_batch_size": 10,
+        "comparisons_per_month": 300,
+        "resume_downloads_per_month": 100
+    }'::jsonb
+),
+
+(
+    'Recruiter Enterprise',
+    'recruiter',
+    3999,
+    NULL,
+    '{
+        "job_posts_per_month": null,
+        "invitations_per_month": null,
+        "comparison_batch_size": null,
+        "comparisons_per_month": null,
+        "resume_downloads_per_month": null
+    }'::jsonb
+)
+
+ON CONFLICT (name) DO NOTHING;

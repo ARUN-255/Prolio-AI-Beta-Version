@@ -4,11 +4,18 @@ const {
   clearPublicPortfolioCacheByUserId,
 } = require("../../Services/cacheService");
 
+const quotaService = require(
+  "../../Services/quotaService"
+);
+
+
+// GET PROJECTS
 const getProjects = async (req, res) => {
   try {
-    const projects = await Project.findAllByUserId(
-      req.user.id
-    );
+    const projects =
+      await Project.findAllByUserId(
+        req.user.id
+      );
 
     return res.status(200).json({
       success: true,
@@ -27,8 +34,12 @@ const getProjects = async (req, res) => {
   }
 };
 
+
+// CREATE PROJECT
 const createProject = async (req, res) => {
   try {
+    const userId = req.user.id;
+
     const {
       title,
       description,
@@ -45,24 +56,90 @@ const createProject = async (req, res) => {
       });
     }
 
-    const project = await Project.create({
-      userId: req.user.id,
-      title,
-      description,
-      techStack: tech_stack,
-      link,
-      isPublic: is_public,
-    });
+    // -------------------------
+    // CHECK PROJECT LIMIT
+    // -------------------------
+
+    const projectLimit =
+      await quotaService.getLimit(
+        userId,
+        "projects_max"
+      );
+
+    if (projectLimit === undefined) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Projects are not available for this plan",
+      });
+    }
+
+    const existingProjects =
+      await Project.findAllByUserId(
+        userId
+      );
+
+    // null = unlimited
+    if (
+      projectLimit !== null &&
+      existingProjects.length >=
+        Number(projectLimit)
+    ) {
+      return res.status(429).json({
+        success: false,
+        message:
+          "Maximum project limit reached",
+        quota: "projects_max",
+        used: existingProjects.length,
+        limit: Number(projectLimit),
+        remaining: 0,
+      });
+    }
+
+    // -------------------------
+    // CREATE PROJECT
+    // -------------------------
+
+    const project =
+      await Project.create({
+        userId,
+        title,
+        description,
+        techStack: tech_stack,
+        link,
+        isPublic: is_public,
+      });
 
     await clearPublicPortfolioCacheByUserId(
-      req.user.id
+      userId
     );
+
+    const used =
+      existingProjects.length + 1;
 
     return res.status(201).json({
       success: true,
       message:
         "Project created successfully",
       project,
+
+      quota: {
+        used,
+        limit:
+          projectLimit === null
+            ? null
+            : Number(projectLimit),
+        remaining:
+          projectLimit === null
+            ? null
+            : Math.max(
+                Number(projectLimit) -
+                  used,
+                0
+              ),
+        unlimited:
+          projectLimit === null,
+      },
     });
   } catch (error) {
     console.error(
@@ -77,9 +154,15 @@ const createProject = async (req, res) => {
   }
 };
 
-const updateProject = async (req, res) => {
+
+// UPDATE PROJECT
+const updateProject = async (
+  req,
+  res
+) => {
   try {
-    const projectId = req.params.id;
+    const projectId =
+      req.params.id;
 
     const existingProject =
       await Project.findByIdAndUserId(
@@ -90,7 +173,8 @@ const updateProject = async (req, res) => {
     if (!existingProject) {
       return res.status(404).json({
         success: false,
-        message: "Project not found",
+        message:
+          "Project not found",
       });
     }
 
@@ -110,15 +194,16 @@ const updateProject = async (req, res) => {
       });
     }
 
-    const project = await Project.update({
-      id: projectId,
-      userId: req.user.id,
-      title,
-      description,
-      techStack: tech_stack,
-      link,
-      isPublic: is_public,
-    });
+    const project =
+      await Project.update({
+        id: projectId,
+        userId: req.user.id,
+        title,
+        description,
+        techStack: tech_stack,
+        link,
+        isPublic: is_public,
+      });
 
     await clearPublicPortfolioCacheByUserId(
       req.user.id
@@ -143,19 +228,27 @@ const updateProject = async (req, res) => {
   }
 };
 
-const deleteProject = async (req, res) => {
-  try {
-    const projectId = req.params.id;
 
-    const project = await Project.delete(
-      projectId,
-      req.user.id
-    );
+// DELETE PROJECT
+const deleteProject = async (
+  req,
+  res
+) => {
+  try {
+    const projectId =
+      req.params.id;
+
+    const project =
+      await Project.delete(
+        projectId,
+        req.user.id
+      );
 
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Project not found",
+        message:
+          "Project not found",
       });
     }
 
@@ -176,6 +269,7 @@ const deleteProject = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   getProjects,

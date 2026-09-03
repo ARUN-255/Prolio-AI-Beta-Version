@@ -140,6 +140,28 @@ const buildPublicPortfolio = async (slug) => {
   return portfolio;
 };
 
+const getPublicPortfolioOwnerId = async (
+  slug
+) => {
+  const user = await User.findBySlug(slug);
+
+  if (!user || user.role !== "student") {
+    return null;
+  }
+
+  const profile =
+    await StudentProfile.findByUserId(
+      user.id
+    );
+
+  if (!profile || !profile.is_public) {
+    return null;
+  }
+
+  return user.id;
+};
+
 module.exports = {
   buildPublicPortfolio,
+  getPublicPortfolioOwnerId,
 };

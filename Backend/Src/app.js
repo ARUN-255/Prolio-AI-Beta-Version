@@ -9,6 +9,9 @@ const {
   connectRedis,
 } = require("./Config/redis");
 
+const cookieParser =
+  require("cookie-parser");
+
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -29,10 +32,30 @@ const startServer = async () => {
     const recruiterRoutes =
       require("./Routes/recruiter.routes");
 
+    const billingRoutes =
+      require("./Routes/billing.routes");
+
     const app = express();
 
     app.use(cors());
-    app.use(express.json());
+    app.use(cookieParser());
+
+    /*
+     * Razorpay webhook needs the original raw request body.
+     * Do not run express.json() on this specific endpoint.
+     */
+    const jsonParser = express.json();
+
+    app.use((req, res, next) => {
+      if (
+        req.originalUrl ===
+        "/api/billing/webhook/razorpay"
+      ) {
+        return next();
+      }
+
+      return jsonParser(req, res, next);
+    });
 
     app.use(
       "/api/auth",
@@ -52,6 +75,11 @@ const startServer = async () => {
     app.use(
       "/api/recruiter",
       recruiterRoutes
+    );
+
+    app.use(
+      "/api/billing",
+      billingRoutes
     );
 
     app.get("/", (req, res) => {

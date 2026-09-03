@@ -1,5 +1,6 @@
 const Resume = require("../../Models/Resume");
 const AtsAnalysis = require("../../Models/AtsAnalysis");
+
 const {
   getAiAtsFeedback,
 } = require("../../Services/geminiAtsService");
@@ -7,6 +8,10 @@ const {
 const {
   analyzeResumeAgainstJob,
 } = require("../../Services/atsService");
+
+const quotaService = require(
+  "../../Services/quotaService"
+);
 
 
 // RUN ATS ANALYSIS
@@ -19,6 +24,10 @@ const runAtsAnalysis = async (req, res) => {
       job_title,
       job_description,
     } = req.body;
+
+    // -------------------------
+    // VALIDATION
+    // -------------------------
 
     if (!resume_id) {
       return res.status(400).json({
@@ -37,10 +46,37 @@ const runAtsAnalysis = async (req, res) => {
       });
     }
 
-    const resume = await Resume.findByIdAndUserId(
-      resume_id,
-      userId
-    );
+    // -------------------------
+    // CHECK ATS QUOTA
+    // -------------------------
+
+    const quota =
+      await quotaService.checkQuota(
+        userId,
+        "ats_checks_per_month"
+      );
+
+    if (!quota.allowed) {
+      return res.status(429).json({
+        success: false,
+        message:
+          "Monthly ATS check limit reached",
+        quota: "ats_checks_per_month",
+        used: quota.used,
+        limit: quota.limit,
+        remaining: quota.remaining,
+      });
+    }
+
+    // -------------------------
+    // GET RESUME
+    // -------------------------
+
+    const resume =
+      await Resume.findByIdAndUserId(
+        resume_id,
+        userId
+      );
 
     if (!resume) {
       return res.status(404).json({
@@ -49,33 +85,49 @@ const runAtsAnalysis = async (req, res) => {
       });
     }
 
+    // -------------------------
+    // DETERMINISTIC ATS
+    // -------------------------
+
     const analysisResult =
       analyzeResumeAgainstJob(
         resume,
         job_description
       );
 
-      let aiFeedback = null;
+    // -------------------------
+    // GEMINI ATS FEEDBACK
+    // -------------------------
+
+    let aiFeedback = null;
 
     try {
-      aiFeedback = await getAiAtsFeedback({
-      resumeData: resume.resume_data || {},
-      jobTitle: job_title,
-      jobDescription: job_description,
-    });
+      aiFeedback =
+        await getAiAtsFeedback({
+          resumeData:
+            resume.resume_data || {},
+          jobTitle: job_title,
+          jobDescription:
+            job_description,
+        });
     } catch (aiError) {
       console.error(
-      "GEMINI ATS FEEDBACK ERROR:",
-      aiError.message
+        "GEMINI ATS FEEDBACK ERROR:",
+        aiError.message
       );
     }
+
+    // -------------------------
+    // SAVE ANALYSIS
+    // -------------------------
 
     const analysis =
       await AtsAnalysis.create({
         userId,
         resumeId: resume_id,
         jobTitle: job_title,
-        jobDescription: job_description,
+        jobDescription:
+          job_description,
 
         atsScore:
           analysisResult.atsScore,
@@ -101,11 +153,31 @@ const runAtsAnalysis = async (req, res) => {
         aiFeedback,
       });
 
-      return res.status(201).json({
-        success: true,
-        message:
+    // -------------------------
+    // CONSUME QUOTA
+    // Only after analysis succeeds
+    // -------------------------
+
+    const quotaUsage =
+      await quotaService.consumeQuota(
+        userId,
+        "ats_checks_per_month"
+      );
+
+    return res.status(201).json({
+      success: true,
+      message:
         "ATS analysis completed successfully",
-        analysis,
+      analysis,
+
+      quota: {
+        used: quotaUsage.used,
+        limit: quotaUsage.limit,
+        remaining:
+          quotaUsage.remaining,
+        unlimited:
+          quotaUsage.unlimited,
+      },
     });
   } catch (error) {
     console.error(
@@ -122,7 +194,10 @@ const runAtsAnalysis = async (req, res) => {
 
 
 // GET ALL ATS ANALYSES
-const getAtsAnalyses = async (req, res) => {
+const getAtsAnalyses = async (
+  req,
+  res
+) => {
   try {
     const analyses =
       await AtsAnalysis.findAllByUserId(
@@ -162,7 +237,8 @@ const getAtsAnalysisById = async (
     if (!analysis) {
       return res.status(404).json({
         success: false,
-        message: "ATS analysis not found",
+        message:
+          "ATS analysis not found",
       });
     }
 
@@ -199,7 +275,8 @@ const deleteAtsAnalysis = async (
     if (!analysis) {
       return res.status(404).json({
         success: false,
-        message: "ATS analysis not found",
+        message:
+          "ATS analysis not found",
       });
     }
 

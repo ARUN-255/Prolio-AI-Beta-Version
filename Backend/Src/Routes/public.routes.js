@@ -2,15 +2,23 @@ const express = require("express");
 
 const router = express.Router();
 
-const chatbotRateLimiter = require("../Middleware/chatbotRateLimiter");
+const chatbotRateLimiter =
+  require("../Middleware/chatbotRateLimiter");
+
+const chatbotVisitor =
+  require("../Middleware/chatbotVisitor");
 
 const {
   getPublicPortfolio,
-} = require("../Controllers/Public/publicPortfolioController");
+} = require(
+  "../Controllers/Public/publicPortfolioController"
+);
 
 const {
   askPublicPortfolioChatbot,
-} = require("../Controllers/Public/chatbotController");
+} = require(
+  "../Controllers/Public/chatbotController"
+);
 
 router.get(
   "/profile/:slug",
@@ -19,7 +27,8 @@ router.get(
 
 router.post(
   "/profile/:slug/chat",
-   chatbotRateLimiter,
+  chatbotRateLimiter,
+  chatbotVisitor,
   askPublicPortfolioChatbot
 );
 
