@@ -1,17 +1,57 @@
 const Subscription = require("../Models/Subscription");
 
+
+// ========================================
+// HELPERS
+// ========================================
+
+const isFreePlan = (planName) => {
+  return (
+    planName === "Student Free" ||
+    planName === "Recruiter Free"
+  );
+};
+
+const getFreePlanName = (role) => {
+  if (role === "student") {
+    return "Student Free";
+  }
+
+  if (role === "recruiter") {
+    return "Recruiter Free";
+  }
+
+  throw new Error("Invalid user role");
+};
+
+
+// ========================================
+// GET PLANS
+// ========================================
+
 const getPlans = async (role = null) => {
-  const plans = await Subscription.getAllPlans();
+  const plans =
+    await Subscription.getAllPlans();
 
   if (!role) {
     return plans;
   }
 
-  return plans.filter((plan) => plan.role === role);
+  return plans.filter(
+    (plan) => plan.role === role
+  );
 };
 
+
+// ========================================
+// GET PLAN BY ID
+// ========================================
+
 const getPlanById = async (planId) => {
-  const plan = await Subscription.getPlanById(planId);
+  const plan =
+    await Subscription.getPlanById(
+      planId
+    );
 
   if (!plan) {
     throw new Error("Plan not found");
@@ -20,34 +60,159 @@ const getPlanById = async (planId) => {
   return plan;
 };
 
-const getUserSubscription = async (userId) => {
-  return Subscription.findByUserId(userId);
-};
 
-const createFreeSubscription = async (user) => {
-  const existingSubscription =
-    await Subscription.findByUserId(user.id);
+// ========================================
+// HANDLE EXPIRED SUBSCRIPTION
+// ========================================
 
-  if (existingSubscription) {
-    return existingSubscription;
+const handleExpiredSubscription = async (
+  subscription
+) => {
+  if (!subscription) {
+    return null;
   }
 
-  const plans = await Subscription.getAllPlans();
+  // Free plans never expire.
+  if (
+    isFreePlan(
+      subscription.plan_name
+    )
+  ) {
+    return subscription;
+  }
+
+  if (
+    subscription.status !== "active"
+  ) {
+    return subscription;
+  }
+
+  if (
+    !subscription.current_period_end
+  ) {
+    return subscription;
+  }
+
+  const periodEnd = new Date(
+    subscription.current_period_end
+  );
+
+  if (
+    Number.isNaN(
+      periodEnd.getTime()
+    )
+  ) {
+    throw new Error(
+      "Invalid subscription period end"
+    );
+  }
+
+  const now = new Date();
+
+  // Paid period has not expired.
+  if (periodEnd > now) {
+    return subscription;
+  }
+
+  /*
+   * The paid period has ended.
+   *
+   * Because Prolio AI currently uses
+   * manual payment unless Auto-Pay is
+   * explicitly configured, an expired
+   * paid subscription returns to Free.
+   *
+   * Scheduled cancellation also reaches
+   * this same path.
+   */
 
   const freePlanName =
-    user.role === "student"
-      ? "Student Free"
-      : user.role === "recruiter"
-      ? "Recruiter Free"
-      : null;
+    getFreePlanName(
+      subscription.plan_role
+    );
 
-  if (!freePlanName) {
-    throw new Error("Invalid user role");
+  const plans =
+    await Subscription.getAllPlans();
+
+  const freePlan =
+    plans.find(
+      (plan) =>
+        plan.name === freePlanName &&
+        plan.role ===
+          subscription.plan_role
+    );
+
+  if (!freePlan) {
+    throw new Error(
+      `${freePlanName} plan not found`
+    );
   }
 
-  const freePlan = plans.find(
-    (plan) => plan.name === freePlanName
+  await Subscription.downgradeToFreePlan(
+    subscription.user_id,
+    freePlan.id
   );
+
+  // Fetch again so caller receives
+  // Free-plan name, limits, prices, etc.
+  return Subscription.findByUserId(
+    subscription.user_id
+  );
+};
+
+
+// ========================================
+// GET USER SUBSCRIPTION
+// ========================================
+
+const getUserSubscription = async (
+  userId
+) => {
+  const subscription =
+    await Subscription.findByUserId(
+      userId
+    );
+
+  if (!subscription) {
+    return null;
+  }
+
+  return handleExpiredSubscription(
+    subscription
+  );
+};
+
+
+// ========================================
+// CREATE FREE SUBSCRIPTION
+// ========================================
+
+const createFreeSubscription = async (
+  user
+) => {
+  const existingSubscription =
+    await Subscription.findByUserId(
+      user.id
+    );
+
+  if (existingSubscription) {
+    return handleExpiredSubscription(
+      existingSubscription
+    );
+  }
+
+  const plans =
+    await Subscription.getAllPlans();
+
+  const freePlanName =
+    getFreePlanName(user.role);
+
+  const freePlan =
+    plans.find(
+      (plan) =>
+        plan.name === freePlanName &&
+        plan.role === user.role
+    );
 
   if (!freePlan) {
     throw new Error(
@@ -62,8 +227,16 @@ const createFreeSubscription = async (user) => {
     autoPay: false,
     status: "active",
     razorpaySubscriptionId: null,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
   });
 };
+
+
+// ========================================
+// VALIDATE PLAN
+// ========================================
 
 const validatePlanForUser = async ({
   userRole,
@@ -71,7 +244,9 @@ const validatePlanForUser = async ({
   billingCycle,
 }) => {
   const plan =
-    await Subscription.getPlanById(planId);
+    await Subscription.getPlanById(
+      planId
+    );
 
   if (!plan) {
     throw new Error("Plan not found");
@@ -83,11 +258,7 @@ const validatePlanForUser = async ({
     );
   }
 
-  const isFreePlan =
-    plan.name === "Student Free" ||
-    plan.name === "Recruiter Free";
-
-  if (isFreePlan) {
+  if (isFreePlan(plan.name)) {
     return {
       plan,
       billingCycle: null,
@@ -119,6 +290,45 @@ const validatePlanForUser = async ({
   };
 };
 
+
+// ========================================
+// CALCULATE PAID PERIOD
+// ========================================
+
+const calculateSubscriptionPeriod = (
+  billingCycle
+) => {
+  const start = new Date();
+  const end = new Date(start);
+
+  if (billingCycle === "monthly") {
+    end.setUTCMonth(
+      end.getUTCMonth() + 1
+    );
+  } else if (
+    billingCycle === "yearly"
+  ) {
+    end.setUTCFullYear(
+      end.getUTCFullYear() + 1
+    );
+  } else {
+    return {
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+    };
+  }
+
+  return {
+    currentPeriodStart: start,
+    currentPeriodEnd: end,
+  };
+};
+
+
+// ========================================
+// ACTIVATE SUBSCRIPTION
+// ========================================
+
 const activateSubscription = async ({
   userId,
   userRole,
@@ -135,7 +345,24 @@ const activateSubscription = async ({
     });
 
   const existingSubscription =
-    await Subscription.findByUserId(userId);
+    await Subscription.findByUserId(
+      userId
+    );
+
+  const free =
+    isFreePlan(
+      validated.plan.name
+    );
+
+  const period =
+    free
+      ? {
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+        }
+      : calculateSubscriptionPeriod(
+          validated.billingCycle
+        );
 
   if (!existingSubscription) {
     return Subscription.create({
@@ -146,6 +373,11 @@ const activateSubscription = async ({
       autoPay,
       status: "active",
       razorpaySubscriptionId,
+      currentPeriodStart:
+        period.currentPeriodStart,
+      currentPeriodEnd:
+        period.currentPeriodEnd,
+      cancelAtPeriodEnd: false,
     });
   }
 
@@ -158,16 +390,28 @@ const activateSubscription = async ({
       autoPay,
       status: "active",
       razorpaySubscriptionId,
+      currentPeriodStart:
+        period.currentPeriodStart,
+      currentPeriodEnd:
+        period.currentPeriodEnd,
+      cancelAtPeriodEnd: false,
     }
   );
 };
+
+
+// ========================================
+// UPDATE AUTO-PAY
+// ========================================
 
 const updateAutoPay = async (
   userId,
   autoPay
 ) => {
   const subscription =
-    await Subscription.findByUserId(userId);
+    await getUserSubscription(
+      userId
+    );
 
   if (!subscription) {
     throw new Error(
@@ -175,13 +419,6 @@ const updateAutoPay = async (
     );
   }
 
-  const isFreePlan =
-    subscription.plan_name ===
-      "Student Free" ||
-    subscription.plan_name ===
-      "Recruiter Free";
-
-  // Auto-Pay can always be turned OFF
   if (autoPay === false) {
     return Subscription.updateAutoPay(
       userId,
@@ -189,17 +426,19 @@ const updateAutoPay = async (
     );
   }
 
-  // Free plans must never use Auto-Pay
-  if (isFreePlan) {
+  if (
+    isFreePlan(
+      subscription.plan_name
+    )
+  ) {
     throw new Error(
       "Auto-Pay is not available for free plans"
     );
   }
 
-  // Paid Auto-Pay requires an actual
-  // Razorpay recurring subscription
   if (
-    !subscription.razorpay_subscription_id
+    !subscription
+      .razorpay_subscription_id
   ) {
     throw new Error(
       "Auto-Pay cannot be enabled until a Razorpay subscription is configured"
@@ -212,11 +451,18 @@ const updateAutoPay = async (
   );
 };
 
+
+// ========================================
+// CANCEL AT PERIOD END
+// ========================================
+
 const cancelSubscription = async (
   userId
 ) => {
   const subscription =
-    await Subscription.findByUserId(userId);
+    await getUserSubscription(
+      userId
+    );
 
   if (!subscription) {
     throw new Error(
@@ -224,11 +470,93 @@ const cancelSubscription = async (
     );
   }
 
-  return Subscription.updateStatus(
-    userId,
-    "cancelled"
+  if (
+    isFreePlan(
+      subscription.plan_name
+    )
+  ) {
+    throw new Error(
+      "Free plans cannot be cancelled"
+    );
+  }
+
+  if (
+    subscription.status !== "active"
+  ) {
+    throw new Error(
+      "Subscription is not active"
+    );
+  }
+
+  if (
+    subscription
+      .cancel_at_period_end === true
+  ) {
+    return subscription;
+  }
+
+  if (
+    !subscription.current_period_end
+  ) {
+    throw new Error(
+      "Subscription period end is missing"
+    );
+  }
+
+  return Subscription.scheduleCancellation(
+    userId
   );
 };
+
+
+// ========================================
+// RESUME SCHEDULED CANCELLATION
+// ========================================
+
+const resumeSubscription = async (
+  userId
+) => {
+  const subscription =
+    await getUserSubscription(
+      userId
+    );
+
+  if (!subscription) {
+    throw new Error(
+      "Subscription not found"
+    );
+  }
+
+  if (
+    isFreePlan(
+      subscription.plan_name
+    )
+  ) {
+    throw new Error(
+      "Free plans do not have a scheduled cancellation"
+    );
+  }
+
+  if (
+    subscription.status !== "active"
+  ) {
+    throw new Error(
+      "Subscription is not active"
+    );
+  }
+
+  if (
+    !subscription
+      .cancel_at_period_end
+  ) {
+    return subscription;
+  }
+
+  return Subscription.removeScheduledCancellation(
+    userId
+  );
+};
+
 
 module.exports = {
   getPlans,
@@ -236,7 +564,10 @@ module.exports = {
   getUserSubscription,
   createFreeSubscription,
   validatePlanForUser,
+  calculateSubscriptionPeriod,
+  handleExpiredSubscription,
   activateSubscription,
   updateAutoPay,
   cancelSubscription,
+  resumeSubscription,
 };

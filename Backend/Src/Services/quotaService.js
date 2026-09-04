@@ -1,13 +1,21 @@
 const { redisClient } = require("../Config/redis");
-const Subscription = require("../Models/Subscription");
+const subscriptionService = require("./subscriptionService");
 
-/*
- * Returns the user's current active subscription
- * together with the plan limits.
- */
+// ========================================
+// QUOTA TTL SETTINGS
+// ========================================
+
+const MONTHLY_TTL_SECONDS = 60 * 60 * 24 * 32;
+const DAILY_TTL_SECONDS = 60 * 60 * 24 * 2;
+
+
+// ========================================
+// GET ACTIVE SUBSCRIPTION
+// ========================================
+
 const getActiveSubscription = async (userId) => {
   const subscription =
-    await Subscription.findByUserId(userId);
+    await subscriptionService.getUserSubscription(userId);
 
   if (!subscription) {
     throw new Error("Subscription not found");
@@ -20,144 +28,38 @@ const getActiveSubscription = async (userId) => {
   return subscription;
 };
 
-/*
- * Get a specific limit from the user's plan.
- *
- * null = unlimited
- * undefined = feature does not exist in the plan
- */
+
+// ========================================
+// GET LIMIT FOR A QUOTA
+// ========================================
+
 const getLimit = async (userId, quotaName) => {
   const subscription =
     await getActiveSubscription(userId);
 
   const limits = subscription.limits || {};
 
-  if (
-    !Object.prototype.hasOwnProperty.call(
-      limits,
-      quotaName
-    )
-  ) {
-    return undefined;
-  }
-
-  return limits[quotaName];
-};
-
-/*
- * Monthly Redis key.
- *
- * Example:
- * quota:7:ats_checks_per_month:2026-09
- */
-const getMonthlyQuotaKey = (
-  userId,
-  quotaName
-) => {
-  const now = new Date();
-
-  const year = now.getUTCFullYear();
-
-  const month = String(
-    now.getUTCMonth() + 1
-  ).padStart(2, "0");
-
-  return `quota:${userId}:${quotaName}:${year}-${month}`;
-};
-
-/*
- * Daily Redis key.
- *
- * Used for limits such as:
- * comparisons_per_day
- */
-const getDailyQuotaKey = (
-  userId,
-  quotaName
-) => {
-  const now = new Date();
-
-  const year = now.getUTCFullYear();
-
-  const month = String(
-    now.getUTCMonth() + 1
-  ).padStart(2, "0");
-
-  const day = String(
-    now.getUTCDate()
-  ).padStart(2, "0");
-
-  return `quota:${userId}:${quotaName}:${year}-${month}-${day}`;
-};
-
-const getQuotaKey = (
-  userId,
-  quotaName
-) => {
-  if (quotaName.endsWith("_per_day")) {
-    return getDailyQuotaKey(
-      userId,
-      quotaName
-    );
-  }
-
-  return getMonthlyQuotaKey(
-    userId,
-    quotaName
-  );
-};
-
-/*
- * Get current usage from Redis.
- */
-const getUsage = async (
-  userId,
-  quotaName
-) => {
-  const key = getQuotaKey(
-    userId,
-    quotaName
-  );
-
-  const value =
-    await redisClient.get(key);
-
-  return value ? Number(value) : 0;
-};
-
-/*
- * Check quota without consuming it.
- */
-const checkQuota = async (
-  userId,
-  quotaName
-) => {
-  const limit = await getLimit(
-    userId,
-    quotaName
-  );
-
-  if (limit === undefined) {
+  if (!Object.prototype.hasOwnProperty.call(limits, quotaName)) {
     throw new Error(
-      `Quota "${quotaName}" is not available for this plan`
+      `Quota "${quotaName}" is not configured for ${subscription.plan_name}`
     );
   }
 
-  // null means unlimited
+  const limit = limits[quotaName];
+
+  // null = unlimited
   if (limit === null) {
     return {
-      allowed: true,
-      unlimited: true,
-      used: 0,
       limit: null,
-      remaining: null,
+      unlimited: true,
+      subscription,
     };
   }
 
   const numericLimit = Number(limit);
 
   if (
-    Number.isNaN(numericLimit) ||
+    !Number.isFinite(numericLimit) ||
     numericLimit < 0
   ) {
     throw new Error(
@@ -165,138 +67,471 @@ const checkQuota = async (
     );
   }
 
-  const used = await getUsage(
+  return {
+    limit: numericLimit,
+    unlimited: false,
+    subscription,
+  };
+};
+
+
+// ========================================
+// BUILD QUOTA PERIOD
+// ========================================
+
+const getQuotaPeriod = (
+  quotaName,
+  subscription = null
+) => {
+  const now = new Date();
+
+  // Daily quotas
+  if (quotaName.endsWith("_per_day")) {
+    const year = now.getUTCFullYear();
+    const month = String(
+      now.getUTCMonth() + 1
+    ).padStart(2, "0");
+    const day = String(
+      now.getUTCDate()
+    ).padStart(2, "0");
+
+    return {
+      period: `${year}-${month}-${day}`,
+      ttl: DAILY_TTL_SECONDS,
+    };
+  }
+
+  /*
+   * Paid plans:
+   * Tie monthly quota usage to the actual
+   * subscription billing period.
+   *
+   * Example:
+   * 2026-09-04 -> 2026-10-04
+   */
+  if (
+    subscription &&
+    subscription.current_period_start &&
+    subscription.current_period_end
+  ) {
+    const start = new Date(
+      subscription.current_period_start
+    );
+
+    const end = new Date(
+      subscription.current_period_end
+    );
+
+    if (
+      !Number.isNaN(start.getTime()) &&
+      !Number.isNaN(end.getTime())
+    ) {
+      const period = `${start.toISOString()}_${end.toISOString()}`;
+
+      const remainingSeconds = Math.max(
+        1,
+        Math.ceil(
+          (end.getTime() - now.getTime()) / 1000
+        )
+      );
+
+      return {
+        period,
+        ttl: remainingSeconds,
+      };
+    }
+  }
+
+  /*
+   * Free plans do not have a paid billing
+   * period, so use calendar month.
+   */
+  const year = now.getUTCFullYear();
+  const month = String(
+    now.getUTCMonth() + 1
+  ).padStart(2, "0");
+
+  return {
+    period: `${year}-${month}`,
+    ttl: MONTHLY_TTL_SECONDS,
+  };
+};
+
+
+// ========================================
+// BUILD REDIS KEY
+// ========================================
+
+const buildQuotaKey = (
+  userId,
+  quotaName,
+  subscription = null
+) => {
+  const { period, ttl } =
+    getQuotaPeriod(
+      quotaName,
+      subscription
+    );
+
+  return {
+    key: `quota:${userId}:${quotaName}:${period}`,
+    ttl,
+  };
+};
+
+
+// ========================================
+// GET CURRENT USAGE
+// ========================================
+
+const getUsage = async (
+  userId,
+  quotaName
+) => {
+  const quota =
+    await getLimit(userId, quotaName);
+
+  if (quota.unlimited) {
+    return {
+      quotaName,
+      used: 0,
+      limit: null,
+      remaining: null,
+      unlimited: true,
+    };
+  }
+
+  const { key } = buildQuotaKey(
     userId,
-    quotaName
+    quotaName,
+    quota.subscription
   );
 
+  const value =
+    await redisClient.get(key);
+
+  const used = value
+    ? Number(value)
+    : 0;
+
   const remaining = Math.max(
-    numericLimit - used,
+    quota.limit - used,
     0
   );
 
   return {
-    allowed: used < numericLimit,
-    unlimited: false,
+    quotaName,
     used,
-    limit: numericLimit,
+    limit: quota.limit,
     remaining,
+    unlimited: false,
   };
 };
 
-/*
- * Consume one quota unit.
- *
- * IMPORTANT:
- * Call this only after the protected action
- * succeeds.
- */
-const consumeQuota = async (
+
+// ========================================
+// CHECK QUOTA
+// ========================================
+
+const checkQuota = async (
   userId,
   quotaName,
   amount = 1
 ) => {
+  const numericAmount = Number(amount);
+
   if (
-    !Number.isInteger(amount) ||
-    amount <= 0
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
   ) {
     throw new Error(
       "Quota amount must be a positive integer"
     );
   }
 
-  const quota = await checkQuota(
-    userId,
-    quotaName
-  );
+  const quota =
+    await getLimit(userId, quotaName);
 
   if (quota.unlimited) {
-    return quota;
-  }
-
-  if (
-    quota.used + amount >
-    quota.limit
-  ) {
     return {
-      allowed: false,
-      unlimited: false,
-      used: quota.used,
-      limit: quota.limit,
-      remaining: quota.remaining,
+      allowed: true,
+      quotaName,
+      used: 0,
+      limit: null,
+      remaining: null,
+      unlimited: true,
     };
   }
 
-  const key = getQuotaKey(
+  const { key } = buildQuotaKey(
     userId,
-    quotaName
+    quotaName,
+    quota.subscription
   );
 
-  const used =
-    await redisClient.incrBy(
-      key,
-      amount
-    );
+  const value =
+    await redisClient.get(key);
 
-  /*
-   * Keep counters temporary.
-   *
-   * 32 days covers monthly counters.
-   * 2 days covers daily counters.
-   * The date inside the key ensures a new
-   * billing period/day gets a fresh counter.
-   */
-  const ttlSeconds =
-    quotaName.endsWith("_per_day")
-      ? 60 * 60 * 24 * 2
-      : 60 * 60 * 24 * 32;
+  const used = value
+    ? Number(value)
+    : 0;
 
-  const ttl =
-    await redisClient.ttl(key);
-
-  if (ttl === -1) {
-    await redisClient.expire(
-      key,
-      ttlSeconds
-    );
-  }
+  const allowed =
+    used + numericAmount <= quota.limit;
 
   return {
-    allowed: true,
-    unlimited: false,
+    allowed,
+    quotaName,
     used,
     limit: quota.limit,
     remaining: Math.max(
       quota.limit - used,
       0
     ),
+    unlimited: false,
   };
 };
 
-/*
- * Reset one quota.
- * Useful for testing/admin operations.
- */
+
+// ========================================
+// ATOMIC QUOTA CONSUMPTION
+// ========================================
+
+const ATOMIC_CONSUME_SCRIPT = `
+local current = tonumber(redis.call("GET", KEYS[1]) or "0")
+local amount = tonumber(ARGV[1])
+local limit = tonumber(ARGV[2])
+local ttl = tonumber(ARGV[3])
+
+if current + amount > limit then
+    return {-1, current}
+end
+
+local newValue = redis.call("INCRBY", KEYS[1], amount)
+
+if newValue == amount then
+    redis.call("EXPIRE", KEYS[1], ttl)
+end
+
+return {1, newValue}
+`;
+
+
+// ========================================
+// CONSUME QUOTA
+// ========================================
+
+const consumeQuota = async (
+  userId,
+  quotaName,
+  amount = 1
+) => {
+  const numericAmount = Number(amount);
+
+  if (
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error(
+      "Quota amount must be a positive integer"
+    );
+  }
+
+  const quota =
+    await getLimit(userId, quotaName);
+
+  if (quota.unlimited) {
+    return {
+      allowed: true,
+      quotaName,
+      used: 0,
+      limit: null,
+      remaining: null,
+      unlimited: true,
+    };
+  }
+
+  const { key, ttl } = buildQuotaKey(
+    userId,
+    quotaName,
+    quota.subscription
+  );
+
+  const result = await redisClient.eval(
+    ATOMIC_CONSUME_SCRIPT,
+    {
+      keys: [key],
+      arguments: [
+        String(numericAmount),
+        String(quota.limit),
+        String(ttl),
+      ],
+    }
+  );
+
+  const allowed =
+    Number(result[0]) === 1;
+
+  const used =
+    Number(result[1]);
+
+  if (!allowed) {
+    return {
+      allowed: false,
+      quotaName,
+      used,
+      limit: quota.limit,
+      remaining: Math.max(
+        quota.limit - used,
+        0
+      ),
+      unlimited: false,
+    };
+  }
+
+  return {
+    allowed: true,
+    quotaName,
+    used,
+    limit: quota.limit,
+    remaining: Math.max(
+      quota.limit - used,
+      0
+    ),
+    unlimited: false,
+  };
+};
+
+
+// ========================================
+// REFUND QUOTA
+// ========================================
+
+const REFUND_QUOTA_SCRIPT = `
+local current = tonumber(redis.call("GET", KEYS[1]) or "0")
+local amount = tonumber(ARGV[1])
+
+if current <= 0 then
+    return 0
+end
+
+local newValue = current - amount
+
+if newValue <= 0 then
+    redis.call("DEL", KEYS[1])
+    return 0
+end
+
+redis.call("SET", KEYS[1], newValue, "KEEPTTL")
+
+return newValue
+`;
+
+const refundQuota = async (
+  userId,
+  quotaName,
+  amount = 1
+) => {
+  const numericAmount = Number(amount);
+
+  if (
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error(
+      "Quota amount must be a positive integer"
+    );
+  }
+
+  const quota =
+    await getLimit(userId, quotaName);
+
+  if (quota.unlimited) {
+    return {
+      quotaName,
+      used: 0,
+      limit: null,
+      remaining: null,
+      unlimited: true,
+    };
+  }
+
+  const { key } = buildQuotaKey(
+    userId,
+    quotaName,
+    quota.subscription
+  );
+
+  const used =
+    await redisClient.eval(
+      REFUND_QUOTA_SCRIPT,
+      {
+        keys: [key],
+        arguments: [
+          String(numericAmount),
+        ],
+      }
+    );
+
+  const numericUsed =
+    Number(used);
+
+  return {
+    quotaName,
+    used: numericUsed,
+    limit: quota.limit,
+    remaining: Math.max(
+      quota.limit - numericUsed,
+      0
+    ),
+    unlimited: false,
+  };
+};
+
+
+// ========================================
+// RESET QUOTA
+// ========================================
+
 const resetQuota = async (
   userId,
   quotaName
 ) => {
-  const key = getQuotaKey(
+  const quota =
+    await getLimit(userId, quotaName);
+
+  if (quota.unlimited) {
+    return {
+      reset: true,
+      quotaName,
+    };
+  }
+
+  const { key } = buildQuotaKey(
     userId,
-    quotaName
+    quotaName,
+    quota.subscription
   );
 
   await redisClient.del(key);
 
-  return true;
+  return {
+    reset: true,
+    quotaName,
+  };
 };
+
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   getActiveSubscription,
   getLimit,
-  getQuotaKey,
   getUsage,
   checkQuota,
   consumeQuota,
+  refundQuota,
   resetQuota,
 };

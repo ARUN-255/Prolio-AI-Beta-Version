@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+
 const {
   buildPublicPortfolio,
   getPublicPortfolioOwnerId,
@@ -15,26 +17,127 @@ const visitorQuotaService = require(
   "../../Services/chatbotVisitorQuotaService"
 );
 
+const questionCacheService = require(
+  "../../Services/chatbotQuestionCacheService"
+);
+
+
+// ========================================
+// CREATE IP FALLBACK ID
+// ========================================
+
+const createIpFallbackId = (req) => {
+  const forwardedFor =
+    req.headers["x-forwarded-for"];
+
+  let ip = "";
+
+  if (
+    typeof forwardedFor === "string" &&
+    forwardedFor.trim()
+  ) {
+    ip =
+      forwardedFor
+        .split(",")[0]
+        .trim();
+  } else {
+    ip =
+      req.ip ||
+      req.socket?.remoteAddress ||
+      "";
+  }
+
+  if (!ip) {
+    return null;
+  }
+
+  /*
+   * Never store the raw IP address
+   * inside Redis quota keys.
+   */
+
+  const hash = crypto
+    .createHash("sha256")
+    .update(ip)
+    .digest("hex");
+
+  return `ip-${hash}`;
+};
+
+
+// ========================================
+// GET VISITOR IDENTITY
+// ========================================
+
+const getVisitorIdentity = (req) => {
+  /*
+   * Primary identity:
+   * visitor cookie created by the
+   * chatbot visitor middleware.
+   */
+
+  const cookieVisitorId =
+    req.chatbotVisitor?.visitorId;
+
+  if (
+    cookieVisitorId &&
+    typeof cookieVisitorId === "string"
+  ) {
+    return cookieVisitorId;
+  }
+
+  /*
+   * Secondary identity:
+   * hashed IP fallback.
+   */
+
+  return createIpFallbackId(req);
+};
+
+
+// ========================================
+// PUBLIC PORTFOLIO CHATBOT
+// ========================================
+
 const askPublicPortfolioChatbot = async (
   req,
   res
 ) => {
+  let ownerId = null;
+  let visitorId = null;
+
+  let monthlyReserved = false;
+  let visitorReserved = false;
+
   try {
-    const { slug } = req.params;
-    const { question } = req.body;
+    const { slug } =
+      req.params;
+
+    const { question } =
+      req.body;
+
+    // ------------------------------------
+    // QUESTION VALIDATION
+    // ------------------------------------
 
     if (
       !question ||
       typeof question !== "string" ||
-      question.trim().length === 0
+      !question.trim()
     ) {
       return res.status(400).json({
         success: false,
-        message: "Question is required",
+        message:
+          "Question is required",
       });
     }
 
-    if (question.trim().length > 500) {
+    const cleanQuestion =
+      question.trim();
+
+    if (
+      cleanQuestion.length > 500
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -42,17 +145,24 @@ const askPublicPortfolioChatbot = async (
       });
     }
 
+    // ------------------------------------
+    // LOAD PUBLIC PORTFOLIO
+    // ------------------------------------
+
     const portfolio =
-      await buildPublicPortfolio(slug);
+      await buildPublicPortfolio(
+        slug
+      );
 
     if (!portfolio) {
       return res.status(404).json({
         success: false,
-        message: "Portfolio not found",
+        message:
+          "Portfolio not found",
       });
     }
 
-    const ownerId =
+    ownerId =
       await getPublicPortfolioOwnerId(
         slug
       );
@@ -65,8 +175,13 @@ const askPublicPortfolioChatbot = async (
       });
     }
 
-    const visitorId =
-      req.chatbotVisitor?.visitorId;
+    // ------------------------------------
+    // IDENTIFY VISITOR
+    // COOKIE FIRST, IP FALLBACK
+    // ------------------------------------
+
+    visitorId =
+      getVisitorIdentity(req);
 
     if (!visitorId) {
       return res.status(500).json({
@@ -76,68 +191,44 @@ const askPublicPortfolioChatbot = async (
       });
     }
 
-    // -------------------------
-    // CHECK OWNER MONTHLY QUOTA
-    // -------------------------
+    // ------------------------------------
+    // NORMALIZED QUESTION CACHE
+    // ------------------------------------
 
-    const monthlyQuota =
-      await quotaService.checkQuota(
-        ownerId,
-        "chatbot_questions_per_month"
-      );
+    const cached =
+      await questionCacheService
+        .getCachedAnswer(
+          ownerId,
+          cleanQuestion
+        );
 
-    if (!monthlyQuota.allowed) {
-      return res.status(429).json({
-        success: false,
-        message:
-          "Monthly chatbot question limit reached",
-        quota:
-          "chatbot_questions_per_month",
-        used: monthlyQuota.used,
-        limit: monthlyQuota.limit,
-        remaining:
-          monthlyQuota.remaining,
+    /*
+     * Duplicate normalized questions are
+     * answered from Redis without another
+     * Gemini call.
+     *
+     * They also do not consume another
+     * owner or visitor quota because no
+     * new AI generation is performed.
+     */
+
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+
+        answer:
+          cached.answer,
+
+        cached: true,
+
+        normalized_question:
+          cached.normalized_question,
       });
     }
 
-    // -------------------------
-    // CHECK VISITOR QUOTA
-    // -------------------------
-
-    const visitorQuota =
-      await visitorQuotaService.checkVisitorQuota(
-        ownerId,
-        visitorId
-      );
-
-    if (!visitorQuota.allowed) {
-      return res.status(429).json({
-        success: false,
-        message:
-          "Visitor chatbot question limit reached",
-        quota:
-          "chatbot_questions_per_visitor",
-        used: visitorQuota.used,
-        limit: visitorQuota.limit,
-        remaining:
-          visitorQuota.remaining,
-      });
-    }
-
-    // -------------------------
-    // ASK AI
-    // -------------------------
-
-    const answer =
-      await askPortfolioChatbot({
-        portfolioData: portfolio,
-        question: question.trim(),
-      });
-
-    // -------------------------
-    // CONSUME BOTH QUOTAS
-    // ONLY AFTER AI SUCCESS
-    // -------------------------
+    // ------------------------------------
+    // ATOMICALLY RESERVE OWNER QUOTA
+    // ------------------------------------
 
     const monthlyUsage =
       await quotaService.consumeQuota(
@@ -145,31 +236,153 @@ const askPublicPortfolioChatbot = async (
         "chatbot_questions_per_month"
       );
 
+    if (!monthlyUsage.allowed) {
+      return res.status(429).json({
+        success: false,
+
+        message:
+          "Monthly chatbot question limit reached",
+
+        quota:
+          "chatbot_questions_per_month",
+
+        used:
+          monthlyUsage.used,
+
+        limit:
+          monthlyUsage.limit,
+
+        remaining:
+          monthlyUsage.remaining,
+      });
+    }
+
+    monthlyReserved =
+      !monthlyUsage.unlimited;
+
+    // ------------------------------------
+    // ATOMICALLY RESERVE VISITOR QUOTA
+    // ------------------------------------
+
     const visitorUsage =
-      await visitorQuotaService.consumeVisitorQuota(
-        ownerId,
-        visitorId
+      await visitorQuotaService
+        .consumeVisitorQuota(
+          ownerId,
+          visitorId
+        );
+
+    if (!visitorUsage.allowed) {
+      /*
+       * Owner quota was already reserved,
+       * but visitor quota failed.
+       *
+       * Return the owner reservation.
+       */
+
+      if (monthlyReserved) {
+        await quotaService.refundQuota(
+          ownerId,
+          "chatbot_questions_per_month"
+        );
+
+        monthlyReserved = false;
+      }
+
+      return res.status(429).json({
+        success: false,
+
+        message:
+          "Visitor chatbot question limit reached",
+
+        quota:
+          "chatbot_questions_per_visitor",
+
+        used:
+          visitorUsage.used,
+
+        limit:
+          visitorUsage.limit,
+
+        remaining:
+          visitorUsage.remaining,
+      });
+    }
+
+    visitorReserved =
+      !visitorUsage.unlimited;
+
+    // ------------------------------------
+    // ASK AI
+    // ------------------------------------
+
+    const answer =
+      await askPortfolioChatbot({
+        portfolioData:
+          portfolio,
+
+        question:
+          cleanQuestion,
+      });
+
+    // ------------------------------------
+    // CACHE SUCCESSFUL ANSWER
+    // ------------------------------------
+
+    try {
+      await questionCacheService
+        .cacheAnswer(
+          ownerId,
+          cleanQuestion,
+          answer
+        );
+    } catch (cacheError) {
+      /*
+       * Redis answer-cache failure should
+       * not discard a valid AI response.
+       */
+
+      console.error(
+        "CHATBOT ANSWER CACHE ERROR:",
+        cacheError
       );
+    }
+
+    // ------------------------------------
+    // SUCCESS
+    // ------------------------------------
 
     return res.status(200).json({
       success: true,
+
       answer,
+
+      cached: false,
 
       quota: {
         monthly: {
-          used: monthlyUsage.used,
-          limit: monthlyUsage.limit,
+          used:
+            monthlyUsage.used,
+
+          limit:
+            monthlyUsage.limit,
+
           remaining:
             monthlyUsage.remaining,
+
           unlimited:
             monthlyUsage.unlimited,
         },
 
         visitor: {
-          used: visitorUsage.used,
-          limit: visitorUsage.limit,
+          used:
+            visitorUsage.used,
+
+          limit:
+            visitorUsage.limit,
+
           remaining:
             visitorUsage.remaining,
+
           unlimited:
             visitorUsage.unlimited,
         },
@@ -181,6 +394,54 @@ const askPublicPortfolioChatbot = async (
       error
     );
 
+    // ------------------------------------
+    // REFUND VISITOR RESERVATION
+    // ------------------------------------
+
+    if (
+      visitorReserved &&
+      ownerId &&
+      visitorId
+    ) {
+      try {
+        await visitorQuotaService
+          .refundVisitorQuota(
+            ownerId,
+            visitorId
+          );
+      } catch (refundError) {
+        console.error(
+          "VISITOR CHATBOT QUOTA REFUND ERROR:",
+          refundError
+        );
+      }
+    }
+
+    // ------------------------------------
+    // REFUND OWNER RESERVATION
+    // ------------------------------------
+
+    if (
+      monthlyReserved &&
+      ownerId
+    ) {
+      try {
+        await quotaService.refundQuota(
+          ownerId,
+          "chatbot_questions_per_month"
+        );
+      } catch (refundError) {
+        console.error(
+          "OWNER CHATBOT QUOTA REFUND ERROR:",
+          refundError
+        );
+      }
+    }
+
+    // ------------------------------------
+    // AI RATE LIMIT
+    // ------------------------------------
+
     if (error.status === 429) {
       return res.status(429).json({
         success: false,
@@ -188,6 +449,10 @@ const askPublicPortfolioChatbot = async (
           "AI request limit reached. Please try again shortly.",
       });
     }
+
+    // ------------------------------------
+    // AI TEMPORARILY UNAVAILABLE
+    // ------------------------------------
 
     if (error.status === 503) {
       return res.status(503).json({
@@ -204,6 +469,11 @@ const askPublicPortfolioChatbot = async (
     });
   }
 };
+
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   askPublicPortfolioChatbot,

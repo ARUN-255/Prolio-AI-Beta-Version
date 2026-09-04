@@ -9,36 +9,20 @@ const Resume = require(
 
 const getResumeData = async ({
   resumeId,
-  userId = null,
 }) => {
-  let resume;
-
-  // PRIVATE / OWNER ACCESS
-  if (userId) {
-    resume =
-      await Resume.findByIdAndUserId(
-        resumeId,
-        userId
-      );
-  }
-
-  // PUBLIC ACCESS
-  else {
-    resume =
-      await Resume.findPublicById(
-        resumeId
-      );
-  }
+  const resume =
+    await Resume.findPublicById(
+      resumeId
+    );
 
   if (!resume) {
     throw new Error(
-      "Resume not found"
+      "Public resume not found"
     );
   }
 
   return {
     id: resume.id,
-    user_id: resume.user_id,
     title: resume.title,
     template_name:
       resume.template_name,

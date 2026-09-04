@@ -9,8 +9,14 @@ const quotaService = require(
 );
 
 
+// ========================================
 // GET PROJECTS
-const getProjects = async (req, res) => {
+// ========================================
+
+const getProjects = async (
+  req,
+  res
+) => {
   try {
     const projects =
       await Project.findAllByUserId(
@@ -29,16 +35,24 @@ const getProjects = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // CREATE PROJECT
-const createProject = async (req, res) => {
+// ========================================
+
+const createProject = async (
+  req,
+  res
+) => {
   try {
-    const userId = req.user.id;
+    const userId =
+      req.user.id;
 
     const {
       title,
@@ -48,7 +62,15 @@ const createProject = async (req, res) => {
       is_public,
     } = req.body;
 
-    if (!title) {
+    // -------------------------
+    // VALIDATION
+    // -------------------------
+
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -56,43 +78,65 @@ const createProject = async (req, res) => {
       });
     }
 
+    if (
+      is_public !== undefined &&
+      typeof is_public !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "is_public must be true or false",
+      });
+    }
+
     // -------------------------
-    // CHECK PROJECT LIMIT
+    // GET PLAN PROJECT LIMIT
     // -------------------------
 
-    const projectLimit =
+    const projectQuota =
       await quotaService.getLimit(
         userId,
         "projects_max"
       );
 
-    if (projectLimit === undefined) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Projects are not available for this plan",
-      });
-    }
+    // -------------------------
+    // GET CURRENT PROJECT COUNT
+    // -------------------------
 
     const existingProjects =
       await Project.findAllByUserId(
         userId
       );
 
-    // null = unlimited
+    const currentCount =
+      existingProjects.length;
+
+    // -------------------------
+    // ENFORCE MAX PROJECT LIMIT
+    // -------------------------
+
     if (
-      projectLimit !== null &&
-      existingProjects.length >=
-        Number(projectLimit)
+      !projectQuota.unlimited &&
+      currentCount >=
+        projectQuota.limit
     ) {
       return res.status(429).json({
         success: false,
         message:
           "Maximum project limit reached",
-        quota: "projects_max",
-        used: existingProjects.length,
-        limit: Number(projectLimit),
+
+        quota:
+          "projects_max",
+
+        used:
+          currentCount,
+
+        limit:
+          projectQuota.limit,
+
         remaining: 0,
+
+        unlimited: false,
       });
     }
 
@@ -103,42 +147,63 @@ const createProject = async (req, res) => {
     const project =
       await Project.create({
         userId,
-        title,
+
+        title:
+          title.trim(),
+
         description,
-        techStack: tech_stack,
+
+        techStack:
+          tech_stack,
+
         link,
-        isPublic: is_public,
+
+        isPublic:
+          is_public,
       });
+
+    // -------------------------
+    // CLEAR PUBLIC CACHE
+    // -------------------------
 
     await clearPublicPortfolioCacheByUserId(
       userId
     );
 
     const used =
-      existingProjects.length + 1;
+      currentCount + 1;
+
+    // -------------------------
+    // SUCCESS RESPONSE
+    // -------------------------
 
     return res.status(201).json({
       success: true,
+
       message:
         "Project created successfully",
+
       project,
 
       quota: {
         used,
+
         limit:
-          projectLimit === null
+          projectQuota.unlimited
             ? null
-            : Number(projectLimit),
+            : projectQuota.limit,
+
         remaining:
-          projectLimit === null
+          projectQuota.unlimited
             ? null
             : Math.max(
-                Number(projectLimit) -
+                projectQuota.limit -
                   used,
                 0
               ),
+
         unlimited:
-          projectLimit === null,
+          projectQuota.unlimited,
       },
     });
   } catch (error) {
@@ -149,13 +214,17 @@ const createProject = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // UPDATE PROJECT
+// ========================================
+
 const updateProject = async (
   req,
   res
@@ -164,10 +233,13 @@ const updateProject = async (
     const projectId =
       req.params.id;
 
+    const userId =
+      req.user.id;
+
     const existingProject =
       await Project.findByIdAndUserId(
         projectId,
-        req.user.id
+        userId
       );
 
     if (!existingProject) {
@@ -186,7 +258,15 @@ const updateProject = async (
       is_public,
     } = req.body;
 
-    if (!title) {
+    // -------------------------
+    // VALIDATION
+    // -------------------------
+
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -194,25 +274,54 @@ const updateProject = async (
       });
     }
 
+    if (
+      is_public !== undefined &&
+      typeof is_public !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "is_public must be true or false",
+      });
+    }
+
+    // -------------------------
+    // UPDATE PROJECT
+    // -------------------------
+
     const project =
       await Project.update({
         id: projectId,
-        userId: req.user.id,
-        title,
+        userId,
+
+        title:
+          title.trim(),
+
         description,
-        techStack: tech_stack,
+
+        techStack:
+          tech_stack,
+
         link,
-        isPublic: is_public,
+
+        isPublic:
+          is_public,
       });
 
+    // -------------------------
+    // CLEAR PUBLIC CACHE
+    // -------------------------
+
     await clearPublicPortfolioCacheByUserId(
-      req.user.id
+      userId
     );
 
     return res.status(200).json({
       success: true,
+
       message:
         "Project updated successfully",
+
       project,
     });
   } catch (error) {
@@ -223,13 +332,17 @@ const updateProject = async (
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // DELETE PROJECT
+// ========================================
+
 const deleteProject = async (
   req,
   res
@@ -238,10 +351,13 @@ const deleteProject = async (
     const projectId =
       req.params.id;
 
+    const userId =
+      req.user.id;
+
     const project =
       await Project.delete(
         projectId,
-        req.user.id
+        userId
       );
 
     if (!project) {
@@ -252,9 +368,24 @@ const deleteProject = async (
       });
     }
 
+    // -------------------------
+    // CLEAR PUBLIC CACHE
+    // -------------------------
+
     await clearPublicPortfolioCacheByUserId(
-      req.user.id
+      userId
     );
+
+    /*
+     * No Redis quota refund is needed here.
+     *
+     * projects_max is based on the actual
+     * number of projects currently stored.
+     *
+     * Once this project is deleted,
+     * Project.findAllByUserId() will
+     * naturally return one fewer project.
+     */
 
     return res.status(204).send();
   } catch (error) {
@@ -265,11 +396,16 @@ const deleteProject = async (
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   getProjects,

@@ -294,3 +294,53 @@ VALUES
 )
 
 ON CONFLICT (name) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS payment_orders (
+    id SERIAL PRIMARY KEY,
+
+    user_id INTEGER NOT NULL
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    plan_id INTEGER NOT NULL
+        REFERENCES plans(id),
+
+    razorpay_order_id TEXT
+        UNIQUE NOT NULL,
+
+    razorpay_payment_id TEXT
+        UNIQUE,
+
+    billing_cycle VARCHAR(20)
+        NOT NULL
+        CHECK (
+            billing_cycle IN (
+                'monthly',
+                'yearly'
+            )
+        ),
+
+    amount_paise INTEGER
+        NOT NULL
+        CHECK (amount_paise > 0),
+
+    currency VARCHAR(10)
+        NOT NULL
+        DEFAULT 'INR',
+
+    status VARCHAR(20)
+        NOT NULL
+        DEFAULT 'created'
+        CHECK (
+            status IN (
+                'created',
+                'paid',
+                'failed'
+            )
+        ),
+
+    created_at TIMESTAMP
+        DEFAULT CURRENT_TIMESTAMP,
+
+    paid_at TIMESTAMP
+);

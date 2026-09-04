@@ -9,8 +9,14 @@ const quotaService = require(
 );
 
 
+// ========================================
 // GET ALL CERTIFICATES
-const getCertificates = async (req, res) => {
+// ========================================
+
+const getCertificates = async (
+  req,
+  res
+) => {
   try {
     const certificates =
       await Certificate.findAllByUserId(
@@ -29,19 +35,24 @@ const getCertificates = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // CREATE CERTIFICATE
+// ========================================
+
 const createCertificate = async (
   req,
   res
 ) => {
   try {
-    const userId = req.user.id;
+    const userId =
+      req.user.id;
 
     const {
       title,
@@ -51,7 +62,15 @@ const createCertificate = async (
       is_public,
     } = req.body;
 
-    if (!title) {
+    // -------------------------
+    // VALIDATION
+    // -------------------------
+
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -59,43 +78,66 @@ const createCertificate = async (
       });
     }
 
+    if (
+      is_public !== undefined &&
+      typeof is_public !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "is_public must be true or false",
+      });
+    }
+
     // -------------------------
-    // CHECK CERTIFICATE LIMIT
+    // GET PLAN CERTIFICATE LIMIT
     // -------------------------
 
-    const certificateLimit =
+    const certificateQuota =
       await quotaService.getLimit(
         userId,
         "certificates_max"
       );
 
-    if (certificateLimit === undefined) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Certificates are not available for this plan",
-      });
-    }
+    // -------------------------
+    // GET CURRENT COUNT
+    // -------------------------
 
     const existingCertificates =
       await Certificate.findAllByUserId(
         userId
       );
 
-    // null = unlimited
+    const currentCount =
+      existingCertificates.length;
+
+    // -------------------------
+    // ENFORCE MAX LIMIT
+    // -------------------------
+
     if (
-      certificateLimit !== null &&
-      existingCertificates.length >=
-        Number(certificateLimit)
+      !certificateQuota.unlimited &&
+      currentCount >=
+        certificateQuota.limit
     ) {
       return res.status(429).json({
         success: false,
+
         message:
           "Maximum certificate limit reached",
-        quota: "certificates_max",
-        used: existingCertificates.length,
-        limit: Number(certificateLimit),
+
+        quota:
+          "certificates_max",
+
+        used:
+          currentCount,
+
+        limit:
+          certificateQuota.limit,
+
         remaining: 0,
+
+        unlimited: false,
       });
     }
 
@@ -106,44 +148,62 @@ const createCertificate = async (
     const certificate =
       await Certificate.create({
         userId,
-        title,
-        issuer,
+
+        title:
+          title.trim(),
+
+        issuer:
+          typeof issuer === "string"
+            ? issuer.trim()
+            : issuer,
+
         date,
-        fileUrl: file_url,
-        isPublic: is_public,
+
+        fileUrl:
+          file_url,
+
+        isPublic:
+          is_public,
       });
+
+    // -------------------------
+    // CLEAR PUBLIC CACHE
+    // -------------------------
 
     await clearPublicPortfolioCacheByUserId(
       userId
     );
 
     const used =
-      existingCertificates.length + 1;
+      currentCount + 1;
 
     return res.status(201).json({
       success: true,
+
       message:
         "Certificate created successfully",
+
       certificate,
 
       quota: {
         used,
+
         limit:
-          certificateLimit === null
+          certificateQuota.unlimited
             ? null
-            : Number(certificateLimit),
+            : certificateQuota.limit,
 
         remaining:
-          certificateLimit === null
+          certificateQuota.unlimited
             ? null
             : Math.max(
-                Number(certificateLimit) -
+                certificateQuota.limit -
                   used,
                 0
               ),
 
         unlimited:
-          certificateLimit === null,
+          certificateQuota.unlimited,
       },
     });
   } catch (error) {
@@ -154,13 +214,17 @@ const createCertificate = async (
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // UPDATE CERTIFICATE
+// ========================================
+
 const updateCertificate = async (
   req,
   res
@@ -169,10 +233,13 @@ const updateCertificate = async (
     const certificateId =
       req.params.id;
 
+    const userId =
+      req.user.id;
+
     const existingCertificate =
       await Certificate.findByIdAndUserId(
         certificateId,
-        req.user.id
+        userId
       );
 
     if (!existingCertificate) {
@@ -191,7 +258,15 @@ const updateCertificate = async (
       is_public,
     } = req.body;
 
-    if (!title) {
+    // -------------------------
+    // VALIDATION
+    // -------------------------
+
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -199,25 +274,59 @@ const updateCertificate = async (
       });
     }
 
+    if (
+      is_public !== undefined &&
+      typeof is_public !== "boolean"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "is_public must be true or false",
+      });
+    }
+
+    // -------------------------
+    // UPDATE CERTIFICATE
+    // -------------------------
+
     const certificate =
       await Certificate.update({
-        id: certificateId,
-        userId: req.user.id,
-        title,
-        issuer,
+        id:
+          certificateId,
+
+        userId,
+
+        title:
+          title.trim(),
+
+        issuer:
+          typeof issuer === "string"
+            ? issuer.trim()
+            : issuer,
+
         date,
-        fileUrl: file_url,
-        isPublic: is_public,
+
+        fileUrl:
+          file_url,
+
+        isPublic:
+          is_public,
       });
 
+    // -------------------------
+    // CLEAR PUBLIC CACHE
+    // -------------------------
+
     await clearPublicPortfolioCacheByUserId(
-      req.user.id
+      userId
     );
 
     return res.status(200).json({
       success: true,
+
       message:
         "Certificate updated successfully",
+
       certificate,
     });
   } catch (error) {
@@ -228,22 +337,29 @@ const updateCertificate = async (
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // DELETE CERTIFICATE
+// ========================================
+
 const deleteCertificate = async (
   req,
   res
 ) => {
   try {
+    const userId =
+      req.user.id;
+
     const certificate =
       await Certificate.delete(
         req.params.id,
-        req.user.id
+        userId
       );
 
     if (!certificate) {
@@ -254,9 +370,24 @@ const deleteCertificate = async (
       });
     }
 
+    // -------------------------
+    // CLEAR PUBLIC CACHE
+    // -------------------------
+
     await clearPublicPortfolioCacheByUserId(
-      req.user.id
+      userId
     );
+
+    /*
+     * certificates_max is based on the
+     * number of certificates currently
+     * stored.
+     *
+     * Deleting one therefore immediately
+     * frees a certificate slot.
+     *
+     * No Redis quota refund is required.
+     */
 
     return res.status(204).send();
   } catch (error) {
@@ -267,11 +398,16 @@ const deleteCertificate = async (
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   getCertificates,

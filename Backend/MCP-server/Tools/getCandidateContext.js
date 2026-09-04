@@ -57,22 +57,33 @@ const Resume = require(
 );
 
 const getCandidateContext = async (
-  userId
+  publicSlug
 ) => {
-  const user = await User.findById(userId);
+  const user =
+    await User.findBySlug(
+      publicSlug
+    );
 
-  if (!user || user.role !== "student") {
+  if (
+    !user ||
+    user.role !== "student"
+  ) {
     throw new Error(
       "Student candidate not found"
     );
   }
+
+  const userId = user.id;
 
   const profile =
     await StudentProfile.findByUserId(
       userId
     );
 
-  if (!profile || !profile.is_public) {
+  if (
+    !profile ||
+    !profile.is_public
+  ) {
     throw new Error(
       "Public candidate profile not found"
     );
@@ -86,12 +97,29 @@ const getCandidateContext = async (
     certificates,
     resumes,
   ] = await Promise.all([
-    Project.findAllByUserId(userId),
-    Experience.findAllByUserId(userId),
-    Education.findAllByUserId(userId),
-    Skill.findAllByUserId(userId),
-    Certificate.findAllByUserId(userId),
-    Resume.findAllByUserId(userId),
+    Project.findAllByUserId(
+      userId
+    ),
+
+    Experience.findAllByUserId(
+      userId
+    ),
+
+    Education.findAllByUserId(
+      userId
+    ),
+
+    Skill.findAllByUserId(
+      userId
+    ),
+
+    Certificate.findAllByUserId(
+      userId
+    ),
+
+    Resume.findAllByUserId(
+      userId
+    ),
   ]);
 
   const publicProjects =
@@ -190,7 +218,8 @@ const getCandidateContext = async (
       )
       .map((resume) => ({
         id: resume.id,
-        title: resume.title,
+        title:
+          resume.title,
         template_name:
           resume.template_name,
         resume_data:
@@ -203,7 +232,6 @@ const getCandidateContext = async (
 
   return {
     candidate: {
-      id: user.id,
       name: user.name,
       public_slug:
         user.public_slug,
@@ -212,7 +240,8 @@ const getCandidateContext = async (
     profile: {
       headline:
         profile.headline,
-      bio: profile.bio,
+      bio:
+        profile.bio,
       location:
         profile.location,
       website:

@@ -1,78 +1,181 @@
-const subscriptionService = require("../../Services/subscriptionService");
-const razorpayService = require("../../Services/razorpayService");
+const subscriptionService = require(
+  "../../Services/subscriptionService"
+);
 
-const createCheckoutOrder = async (req, res) => {
+const razorpayService = require(
+  "../../Services/razorpayService"
+);
+
+const PaymentOrder = require(
+  "../../Models/PaymentOrder"
+);
+
+const createCheckoutOrder = async (
+  req,
+  res
+) => {
   try {
-    const userId = req.user.id;
-    const userRole = req.user.role;
+    const userId =
+      req.user.id;
 
-    const { plan_id, billing_cycle } = req.body;
+    const userRole =
+      req.user.role;
+
+    const {
+      plan_id,
+      billing_cycle,
+    } = req.body;
 
     if (!plan_id) {
       return res.status(400).json({
-        message: "plan_id is required",
+        message:
+          "plan_id is required",
       });
     }
 
-    const { plan, billingCycle } =
-      await subscriptionService.validatePlanForUser({
-        userRole,
-        planId: plan_id,
-        billingCycle: billing_cycle,
-      });
+    const {
+      plan,
+      billingCycle,
+    } =
+      await subscriptionService
+        .validatePlanForUser({
+          userRole,
+          planId: plan_id,
+          billingCycle:
+            billing_cycle,
+        });
 
     const isFreePlan =
-      plan.name === "Student Free" ||
-      plan.name === "Recruiter Free";
+      plan.name ===
+        "Student Free" ||
+      plan.name ===
+        "Recruiter Free";
 
     if (isFreePlan) {
       return res.status(400).json({
-        message: "Free plans do not require checkout",
+        message:
+          "Free plans do not require checkout",
       });
     }
 
     const amount =
-      billingCycle === "monthly"
-        ? Number(plan.price_monthly)
-        : Number(plan.price_yearly);
+      billingCycle ===
+      "monthly"
+        ? Number(
+            plan.price_monthly
+          )
+        : Number(
+            plan.price_yearly
+          );
 
-    if (!amount || amount <= 0) {
+    if (
+      !amount ||
+      amount <= 0
+    ) {
       return res.status(400).json({
-        message: "Invalid plan price",
+        message:
+          "Invalid plan price",
       });
     }
 
-    const receipt = `prolio_${userId}_${Date.now()}`;
+    // Razorpay expects amount
+    // in paise.
+    const amountPaise =
+      Math.round(
+        amount * 100
+      );
 
-    const order = await razorpayService.createOrder({
-      amount,
-      currency: "INR",
-      receipt,
-      notes: {
-        user_id: String(userId),
-        plan_id: String(plan.id),
-        plan_name: plan.name,
-        billing_cycle: billingCycle,
-      },
+    const receipt =
+      `prolio_${userId}_${Date.now()}`;
+
+    // -------------------------
+    // CREATE RAZORPAY ORDER
+    // -------------------------
+
+    const order =
+      await razorpayService
+        .createOrder({
+          amount,
+          currency: "INR",
+          receipt,
+
+          notes: {
+            user_id:
+              String(userId),
+
+            plan_id:
+              String(plan.id),
+
+            plan_name:
+              plan.name,
+
+            billing_cycle:
+              billingCycle,
+          },
+        });
+
+    // -------------------------
+    // STORE TRUSTED ORDER
+    // LOCALLY
+    // -------------------------
+
+    await PaymentOrder.create({
+      userId,
+
+      planId:
+        plan.id,
+
+      razorpayOrderId:
+        order.id,
+
+      billingCycle,
+
+      amountPaise,
+
+      currency:
+        order.currency ||
+        "INR",
     });
 
-    return res.status(201).json({
-      message: "Checkout order created",
-      checkout: {
-        order_id: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        plan_id: plan.id,
-        plan_name: plan.name,
-        billing_cycle: billingCycle,
-      },
-    });
+    return res
+      .status(201)
+      .json({
+        message:
+          "Checkout order created",
+
+        checkout: {
+          order_id:
+            order.id,
+
+          amount:
+            order.amount,
+
+          currency:
+            order.currency,
+
+          plan_id:
+            plan.id,
+
+          plan_name:
+            plan.name,
+
+          billing_cycle:
+            billingCycle,
+        },
+      });
   } catch (error) {
-    console.error("CREATE CHECKOUT ORDER ERROR:", error);
+    console.error(
+      "CREATE CHECKOUT ORDER ERROR:",
+      error
+    );
 
-    return res.status(400).json({
-      message: error.message || "Failed to create checkout order",
-    });
+    return res
+      .status(400)
+      .json({
+        message:
+          error.message ||
+          "Failed to create checkout order",
+      });
   }
 };
 

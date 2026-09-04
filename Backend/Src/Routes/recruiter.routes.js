@@ -15,6 +15,7 @@ const {
 const {
   getPublicResume,
   comparePublicResumes,
+  downloadPublicResume,
 } = require("../Controllers/Recruiter/comparisonController");
 
 const {
@@ -40,6 +41,13 @@ router.post(
   protect,
   authorize("recruiter"),
   comparePublicResumes
+);
+
+router.get(
+  "/resumes/:id/download",
+  protect,
+  authorize("recruiter"),
+  downloadPublicResume
 );
 
 router.get(

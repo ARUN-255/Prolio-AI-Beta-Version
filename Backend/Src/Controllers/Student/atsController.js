@@ -14,11 +14,16 @@ const quotaService = require(
 );
 
 
+// ========================================
 // RUN ATS ANALYSIS
-const runAtsAnalysis = async (req, res) => {
-  try {
-    const userId = req.user.id;
+// ========================================
 
+const runAtsAnalysis = async (req, res) => {
+  const userId = req.user.id;
+
+  let quotaReserved = false;
+
+  try {
     const {
       resume_id,
       job_title,
@@ -38,38 +43,22 @@ const runAtsAnalysis = async (req, res) => {
 
     if (
       !job_description ||
+      typeof job_description !== "string" ||
       !job_description.trim()
     ) {
       return res.status(400).json({
         success: false,
-        message: "job_description is required",
-      });
-    }
-
-    // -------------------------
-    // CHECK ATS QUOTA
-    // -------------------------
-
-    const quota =
-      await quotaService.checkQuota(
-        userId,
-        "ats_checks_per_month"
-      );
-
-    if (!quota.allowed) {
-      return res.status(429).json({
-        success: false,
         message:
-          "Monthly ATS check limit reached",
-        quota: "ats_checks_per_month",
-        used: quota.used,
-        limit: quota.limit,
-        remaining: quota.remaining,
+          "job_description is required",
       });
     }
 
     // -------------------------
-    // GET RESUME
+    // GET RESUME FIRST
+    // -------------------------
+    // We verify ownership before reserving
+    // quota so an invalid resume ID does
+    // not consume one ATS check.
     // -------------------------
 
     const resume =
@@ -86,13 +75,39 @@ const runAtsAnalysis = async (req, res) => {
     }
 
     // -------------------------
+    // ATOMICALLY RESERVE ATS QUOTA
+    // -------------------------
+
+    const quotaUsage =
+      await quotaService.consumeQuota(
+        userId,
+        "ats_checks_per_month"
+      );
+
+    if (!quotaUsage.allowed) {
+      return res.status(429).json({
+        success: false,
+        message:
+          "Monthly ATS check limit reached",
+        quota: "ats_checks_per_month",
+        used: quotaUsage.used,
+        limit: quotaUsage.limit,
+        remaining:
+          quotaUsage.remaining,
+      });
+    }
+
+    quotaReserved =
+      !quotaUsage.unlimited;
+
+    // -------------------------
     // DETERMINISTIC ATS
     // -------------------------
 
     const analysisResult =
       analyzeResumeAgainstJob(
         resume,
-        job_description
+        job_description.trim()
       );
 
     // -------------------------
@@ -106,15 +121,26 @@ const runAtsAnalysis = async (req, res) => {
         await getAiAtsFeedback({
           resumeData:
             resume.resume_data || {},
-          jobTitle: job_title,
+          jobTitle:
+            typeof job_title === "string"
+              ? job_title.trim()
+              : job_title,
           jobDescription:
-            job_description,
+            job_description.trim(),
         });
     } catch (aiError) {
       console.error(
         "GEMINI ATS FEEDBACK ERROR:",
         aiError.message
       );
+
+      /*
+       * AI failure does NOT fail the
+       * complete ATS request.
+       *
+       * Deterministic ATS still works,
+       * so we continue and save the result.
+       */
     }
 
     // -------------------------
@@ -125,9 +151,14 @@ const runAtsAnalysis = async (req, res) => {
       await AtsAnalysis.create({
         userId,
         resumeId: resume_id,
-        jobTitle: job_title,
+
+        jobTitle:
+          typeof job_title === "string"
+            ? job_title.trim()
+            : job_title,
+
         jobDescription:
-          job_description,
+          job_description.trim(),
 
         atsScore:
           analysisResult.atsScore,
@@ -154,20 +185,14 @@ const runAtsAnalysis = async (req, res) => {
       });
 
     // -------------------------
-    // CONSUME QUOTA
-    // Only after analysis succeeds
+    // SUCCESS
     // -------------------------
-
-    const quotaUsage =
-      await quotaService.consumeQuota(
-        userId,
-        "ats_checks_per_month"
-      );
 
     return res.status(201).json({
       success: true,
       message:
         "ATS analysis completed successfully",
+
       analysis,
 
       quota: {
@@ -185,6 +210,25 @@ const runAtsAnalysis = async (req, res) => {
       error
     );
 
+    // -------------------------
+    // REFUND RESERVED QUOTA
+    // IF ATS PROCESS FAILED
+    // -------------------------
+
+    if (quotaReserved) {
+      try {
+        await quotaService.refundQuota(
+          userId,
+          "ats_checks_per_month"
+        );
+      } catch (refundError) {
+        console.error(
+          "ATS QUOTA REFUND ERROR:",
+          refundError
+        );
+      }
+    }
+
     return res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -193,7 +237,10 @@ const runAtsAnalysis = async (req, res) => {
 };
 
 
+// ========================================
 // GET ALL ATS ANALYSES
+// ========================================
+
 const getAtsAnalyses = async (
   req,
   res
@@ -222,7 +269,10 @@ const getAtsAnalyses = async (
 };
 
 
+// ========================================
 // GET ONE ATS ANALYSIS
+// ========================================
+
 const getAtsAnalysisById = async (
   req,
   res
@@ -260,7 +310,10 @@ const getAtsAnalysisById = async (
 };
 
 
+// ========================================
 // DELETE ATS ANALYSIS
+// ========================================
+
 const deleteAtsAnalysis = async (
   req,
   res
@@ -294,6 +347,10 @@ const deleteAtsAnalysis = async (
   }
 };
 
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   runAtsAnalysis,

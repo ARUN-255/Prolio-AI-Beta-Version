@@ -2,14 +2,36 @@ const {
   redisClient,
 } = require("../Config/redis");
 
-const Subscription =
-  require("../Models/Subscription");
+const subscriptionService = require(
+  "./subscriptionService"
+);
+
+
+// ========================================
+// CONSTANTS
+// ========================================
+
+const VISITOR_QUOTA_TTL =
+  60 * 60 * 24 * 30;
+
+
+// ========================================
+// GET VISITOR LIMIT
+// ========================================
 
 const getVisitorLimit = async (
   ownerId
 ) => {
+  /*
+   * Use subscriptionService rather than
+   * Subscription.findByUserId directly.
+   *
+   * This ensures an expired paid plan is
+   * processed before its limits are used.
+   */
+
   const subscription =
-    await Subscription.findByUserId(
+    await subscriptionService.getUserSubscription(
       ownerId
     );
 
@@ -20,8 +42,7 @@ const getVisitorLimit = async (
   }
 
   if (
-    subscription.status !==
-    "active"
+    subscription.status !== "active"
   ) {
     throw new Error(
       "Subscription is not active"
@@ -39,15 +60,59 @@ const getVisitorLimit = async (
     );
   }
 
-  return limit;
+  if (limit === null) {
+    return null;
+  }
+
+  const numericLimit =
+    Number(limit);
+
+  if (
+    !Number.isFinite(numericLimit) ||
+    numericLimit < 0
+  ) {
+    throw new Error(
+      "Invalid visitor chatbot quota configuration"
+    );
+  }
+
+  return numericLimit;
 };
+
+
+// ========================================
+// VISITOR QUOTA KEY
+// ========================================
 
 const getVisitorQuotaKey = (
   ownerId,
   visitorId
 ) => {
-  return `chatbot-visitor:${ownerId}:${visitorId}`;
+  if (!ownerId) {
+    throw new Error(
+      "ownerId is required"
+    );
+  }
+
+  if (
+    !visitorId ||
+    typeof visitorId !== "string"
+  ) {
+    throw new Error(
+      "visitorId is required"
+    );
+  }
+
+  return (
+    `chatbot-visitor:${ownerId}:` +
+    `${visitorId}`
+  );
 };
+
+
+// ========================================
+// GET VISITOR USAGE
+// ========================================
 
 const getVisitorUsage = async (
   ownerId,
@@ -66,6 +131,11 @@ const getVisitorUsage = async (
     ? Number(value)
     : 0;
 };
+
+
+// ========================================
+// CHECK VISITOR QUOTA
+// ========================================
 
 const checkVisitorQuota = async (
   ownerId,
@@ -86,9 +156,6 @@ const checkVisitorQuota = async (
     };
   }
 
-  const numericLimit =
-    Number(limit);
-
   const used =
     await getVisitorUsage(
       ownerId,
@@ -97,33 +164,44 @@ const checkVisitorQuota = async (
 
   return {
     allowed:
-      used < numericLimit,
+      used < limit,
+
     unlimited: false,
+
     used,
-    limit: numericLimit,
-    remaining: Math.max(
-      numericLimit - used,
-      0
-    ),
+
+    limit,
+
+    remaining:
+      Math.max(
+        limit - used,
+        0
+      ),
   };
 };
+
+
+// ========================================
+// ATOMICALLY CONSUME VISITOR QUOTA
+// ========================================
 
 const consumeVisitorQuota = async (
   ownerId,
   visitorId
 ) => {
-  const quota =
-    await checkVisitorQuota(
-      ownerId,
-      visitorId
+  const limit =
+    await getVisitorLimit(
+      ownerId
     );
 
-  if (quota.unlimited) {
-    return quota;
-  }
-
-  if (!quota.allowed) {
-    return quota;
+  if (limit === null) {
+    return {
+      allowed: true,
+      unlimited: true,
+      used: 0,
+      limit: null,
+      remaining: null,
+    };
   }
 
   const key =
@@ -132,30 +210,245 @@ const consumeVisitorQuota = async (
       visitorId
     );
 
-  const used =
-    await redisClient.incr(key);
+  /*
+   * Atomically:
+   *
+   * 1. Read current usage
+   * 2. Reject when limit reached
+   * 3. Increment usage
+   * 4. Add 30-day TTL on first use
+   *
+   * This prevents simultaneous requests
+   * from exceeding the visitor limit.
+   */
 
-  const ttl =
-    await redisClient.ttl(key);
+  const result =
+    await redisClient.eval(
+      `
+      local current =
+        tonumber(redis.call(
+          "GET",
+          KEYS[1]
+        ) or "0")
 
-  if (ttl === -1) {
-    await redisClient.expire(
-      key,
-      60 * 60 * 24 * 30
+      local limit =
+        tonumber(ARGV[1])
+
+      local ttl =
+        tonumber(ARGV[2])
+
+      if current >= limit then
+        return {
+          0,
+          current
+        }
+      end
+
+      local used =
+        redis.call(
+          "INCR",
+          KEYS[1]
+        )
+
+      local currentTtl =
+        redis.call(
+          "TTL",
+          KEYS[1]
+        )
+
+      if currentTtl == -1 then
+        redis.call(
+          "EXPIRE",
+          KEYS[1],
+          ttl
+        )
+      end
+
+      return {
+        1,
+        used
+      }
+      `,
+      {
+        keys: [key],
+        arguments: [
+          String(limit),
+          String(
+            VISITOR_QUOTA_TTL
+          ),
+        ],
+      }
     );
-  }
+
+  const allowed =
+    Number(result[0]) === 1;
+
+  const used =
+    Number(result[1]);
 
   return {
-    allowed: true,
+    allowed,
+
     unlimited: false,
+
     used,
-    limit: quota.limit,
-    remaining: Math.max(
-      quota.limit - used,
-      0
-    ),
+
+    limit,
+
+    remaining:
+      Math.max(
+        limit - used,
+        0
+      ),
   };
 };
+
+
+// ========================================
+// REFUND VISITOR QUOTA
+// ========================================
+
+const refundVisitorQuota = async (
+  ownerId,
+  visitorId
+) => {
+  const limit =
+    await getVisitorLimit(
+      ownerId
+    );
+
+  if (limit === null) {
+    return {
+      refunded: false,
+      unlimited: true,
+      used: 0,
+      limit: null,
+      remaining: null,
+    };
+  }
+
+  const key =
+    getVisitorQuotaKey(
+      ownerId,
+      visitorId
+    );
+
+  /*
+   * Preserve the existing TTL.
+   *
+   * If usage becomes zero, remove the key
+   * completely.
+   */
+
+  const result =
+    await redisClient.eval(
+      `
+      local current =
+        tonumber(redis.call(
+          "GET",
+          KEYS[1]
+        ) or "0")
+
+      if current <= 0 then
+        return {
+          0,
+          0
+        }
+      end
+
+      local ttl =
+        redis.call(
+          "TTL",
+          KEYS[1]
+        )
+
+      local updated =
+        current - 1
+
+      if updated <= 0 then
+        redis.call(
+          "DEL",
+          KEYS[1]
+        )
+
+        return {
+          1,
+          0
+        }
+      end
+
+      redis.call(
+        "SET",
+        KEYS[1],
+        updated
+      )
+
+      if ttl > 0 then
+        redis.call(
+          "EXPIRE",
+          KEYS[1],
+          ttl
+        )
+      end
+
+      return {
+        1,
+        updated
+      }
+      `,
+      {
+        keys: [key],
+        arguments: [],
+      }
+    );
+
+  const refunded =
+    Number(result[0]) === 1;
+
+  const used =
+    Number(result[1]);
+
+  return {
+    refunded,
+
+    unlimited: false,
+
+    used,
+
+    limit,
+
+    remaining:
+      Math.max(
+        limit - used,
+        0
+      ),
+  };
+};
+
+
+// ========================================
+// RESET VISITOR QUOTA
+// ========================================
+
+const resetVisitorQuota = async (
+  ownerId,
+  visitorId
+) => {
+  const key =
+    getVisitorQuotaKey(
+      ownerId,
+      visitorId
+    );
+
+  await redisClient.del(key);
+
+  return true;
+};
+
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   getVisitorLimit,
@@ -163,4 +456,6 @@ module.exports = {
   getVisitorUsage,
   checkVisitorQuota,
   consumeVisitorQuota,
+  refundVisitorQuota,
+  resetVisitorQuota,
 };

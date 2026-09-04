@@ -21,7 +21,10 @@ const quotaService = require(
 );
 
 
+// ========================================
 // GET ALL RESUMES
+// ========================================
+
 const getResumes = async (req, res) => {
   try {
     const resumes =
@@ -47,7 +50,10 @@ const getResumes = async (req, res) => {
 };
 
 
+// ========================================
 // GET ONE RESUME
+// ========================================
+
 const getResumeById = async (
   req,
   res
@@ -84,14 +90,19 @@ const getResumeById = async (
 };
 
 
+// ========================================
 // CREATE RESUME
+// ========================================
+
 const createResume = async (
   req,
   res
 ) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
+  let quotaReserved = false;
+
+  try {
     const {
       title,
       template_name,
@@ -100,7 +111,15 @@ const createResume = async (
       is_public,
     } = req.body;
 
-    if (!title) {
+    // -------------------------
+    // VALIDATION
+    // -------------------------
+
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -109,26 +128,34 @@ const createResume = async (
     }
 
     // -------------------------
-    // CHECK RESUME QUOTA
+    // ATOMICALLY RESERVE QUOTA
     // -------------------------
 
-    const quota =
-      await quotaService.checkQuota(
+    const quotaUsage =
+      await quotaService.consumeQuota(
         userId,
         "resumes_per_month"
       );
 
-    if (!quota.allowed) {
+    if (!quotaUsage.allowed) {
       return res.status(429).json({
         success: false,
         message:
           "Monthly resume creation limit reached",
         quota: "resumes_per_month",
-        used: quota.used,
-        limit: quota.limit,
-        remaining: quota.remaining,
+        used: quotaUsage.used,
+        limit: quotaUsage.limit,
+        remaining:
+          quotaUsage.remaining,
       });
     }
+
+    quotaReserved =
+      !quotaUsage.unlimited;
+
+    // -------------------------
+    // PRIMARY RESUME HANDLING
+    // -------------------------
 
     if (is_primary === true) {
       await Resume.clearPrimary(
@@ -143,7 +170,7 @@ const createResume = async (
     const resume =
       await Resume.create({
         userId,
-        title,
+        title: title.trim(),
         templateName:
           template_name,
         resumeData:
@@ -153,17 +180,6 @@ const createResume = async (
         isPublic:
           is_public,
       });
-
-    // -------------------------
-    // CONSUME QUOTA
-    // Only after creation succeeds
-    // -------------------------
-
-    const quotaUsage =
-      await quotaService.consumeQuota(
-        userId,
-        "resumes_per_month"
-      );
 
     return res.status(201).json({
       success: true,
@@ -186,15 +202,38 @@ const createResume = async (
       error
     );
 
+    // -------------------------
+    // REFUND RESERVED QUOTA
+    // IF CREATION FAILED
+    // -------------------------
+
+    if (quotaReserved) {
+      try {
+        await quotaService.refundQuota(
+          userId,
+          "resumes_per_month"
+        );
+      } catch (refundError) {
+        console.error(
+          "RESUME QUOTA REFUND ERROR:",
+          refundError
+        );
+      }
+    }
+
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message:
+        "Internal server error",
     });
   }
 };
 
 
+// ========================================
 // UPDATE RESUME
+// ========================================
+
 const updateResume = async (
   req,
   res
@@ -223,7 +262,11 @@ const updateResume = async (
       is_public,
     } = req.body;
 
-    if (!title) {
+    if (
+      !title ||
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -242,7 +285,7 @@ const updateResume = async (
       await Resume.update({
         id: resumeId,
         userId: req.user.id,
-        title,
+        title: title.trim(),
         templateName:
           template_name,
         resumeData:
@@ -273,7 +316,10 @@ const updateResume = async (
 };
 
 
+// ========================================
 // DELETE RESUME
+// ========================================
+
 const deleteResume = async (
   req,
   res
@@ -324,7 +370,10 @@ const deleteResume = async (
 };
 
 
+// ========================================
 // IMPORT RESUME DATA FROM PORTFOLIO
+// ========================================
+
 const importResumeFromPortfolio = async (
   req,
   res
@@ -355,7 +404,10 @@ const importResumeFromPortfolio = async (
 };
 
 
+// ========================================
 // UPDATE COMPLETE RESUME DATA
+// ========================================
+
 const updateResumeData = async (
   req,
   res
@@ -418,7 +470,10 @@ const updateResumeData = async (
 };
 
 
+// ========================================
 // UPDATE ONE RESUME SECTION
+// ========================================
+
 const updateResumeSection = async (
   req,
   res
@@ -491,7 +546,10 @@ const updateResumeSection = async (
 };
 
 
+// ========================================
 // DELETE ONE RESUME SECTION
+// ========================================
+
 const deleteResumeSection = async (
   req,
   res
@@ -557,7 +615,10 @@ const deleteResumeSection = async (
 };
 
 
+// ========================================
 // GENERATE RESUME PDF AND UPLOAD TO S3
+// ========================================
+
 const generateResumePdfFile = async (
   req,
   res
@@ -656,7 +717,10 @@ const generateResumePdfFile = async (
 };
 
 
+// ========================================
 // GET TEMPORARY SECURE PDF URL
+// ========================================
+
 const getResumePdfUrl = async (
   req,
   res
@@ -715,7 +779,10 @@ const getResumePdfUrl = async (
 };
 
 
+// ========================================
 // UPDATE RESUME PUBLIC VISIBILITY
+// ========================================
+
 const updateResumeVisibility = async (
   req,
   res
@@ -781,6 +848,10 @@ const updateResumeVisibility = async (
   }
 };
 
+
+// ========================================
+// EXPORTS
+// ========================================
 
 module.exports = {
   getResumes,
