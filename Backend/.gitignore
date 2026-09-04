@@ -2,3 +2,34 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Generated / temporary files
+.tmp/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Generated resume / PDF exports
+*.pdf
+!../Docs/**/*.pdf
+
+# Test-only payment pages / local artifacts
+razorpay-test.html
+
+# Coverage
+coverage/
+.nyc_output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
