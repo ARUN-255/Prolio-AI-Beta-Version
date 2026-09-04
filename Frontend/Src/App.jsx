@@ -1,25 +1,30 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import HomePage from "./Pages/Home/HomePage";
+
+function PlaceholderPage({ title }) {
+  return (
+    <main className="placeholder-page">
+      <div className="container">
+        <p className="eyebrow">Prolio AI</p>
+        <h1>{title}</h1>
+        <p>This page will be completed in its dedicated frontend step.</p>
+      </div>
+    </main>
+  );
+}
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/welcome" replace />} />
-      <Route
-        path="/welcome"
-        element={
-          <main className="app-shell">
-            <section className="welcome-card" aria-labelledby="welcome-title">
-              <p className="eyebrow">Prolio AI</p>
-              <h1 id="welcome-title">Build your professional profile with clarity.</h1>
-              <p className="welcome-copy">
-                The frontend foundation is running. Authentication, dashboards, portfolio,
-                resume tools, ATS, recruiter tools, and billing will be added through this SPA.
-              </p>
-            </section>
-          </main>
-        }
-      />
-      <Route path="*" element={<Navigate to="/welcome" replace />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/welcome" element={<Navigate to="/" replace />} />
+      <Route path="/features" element={<PlaceholderPage title="Features" />} />
+      <Route path="/students" element={<PlaceholderPage title="For Students" />} />
+      <Route path="/recruiters" element={<PlaceholderPage title="For Recruiters" />} />
+      <Route path="/pricing" element={<PlaceholderPage title="Pricing" />} />
+      <Route path="/login" element={<PlaceholderPage title="Log in" />} />
+      <Route path="/register" element={<PlaceholderPage title="Create your account" />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
