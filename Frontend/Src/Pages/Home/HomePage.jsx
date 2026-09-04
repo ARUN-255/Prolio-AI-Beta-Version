@@ -1,27 +1,23 @@
-import { ArrowRight, BriefcaseBusiness, FileCheck2, Sparkles, UserRound } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, FileCheck2, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import PublicHeader from "../../Components/Layout/PublicHeader";
+import PublicFooter from "../../Components/Layout/PublicFooter";
 
 const features = [
   {
     icon: UserRound,
-    title: "Build your portfolio",
-    copy: "Turn your education, skills, projects and experience into a clear professional profile.",
+    title: "Portfolio Builder",
+    copy: "Keep your education, skills, projects and experience in one profile.",
   },
   {
     icon: FileCheck2,
-    title: "Create stronger resumes",
-    copy: "Build structured resumes and check how well they match the roles you are targeting.",
-  },
-  {
-    icon: Sparkles,
-    title: "Use AI with context",
-    copy: "Let your public profile answer relevant questions about your work without hiding the facts.",
+    title: "Resume and ATS",
+    copy: "Create resumes and check how closely they match a job description.",
   },
   {
     icon: BriefcaseBusiness,
-    title: "Evaluate candidates",
-    copy: "Give recruiters focused tools to search, compare and understand opted-in candidate profiles.",
+    title: "Recruiter Tools",
+    copy: "Search, compare and review candidate profiles from one workspace.",
   },
 ];
 
@@ -29,45 +25,47 @@ function HomePage() {
   return (
     <div className="public-page">
       <PublicHeader />
+
       <main>
         <section className="hero-section">
           <div className="container hero-grid">
             <div className="hero-copy">
-              <p className="eyebrow">One professional workspace</p>
-              <h1>Build your profile. Prove your skills. Move forward.</h1>
+              <p className="eyebrow">Career tools in one place</p>
+              <h1>Build your profile and present your skills better.</h1>
               <p className="hero-description">
-                Prolio AI brings portfolios, resumes, ATS insights and career tools into one clear workspace for students and recruiters.
+                Prolio AI helps students create portfolios and resumes, check ATS scores,
+                and gives recruiters simple tools to review candidates.
               </p>
+
               <div className="hero-actions">
                 <Link className="button button-primary button-large" to="/register">
-                  Start building <ArrowRight size={18} aria-hidden="true" />
+                  Get started <ArrowRight size={18} aria-hidden="true" />
                 </Link>
-                <Link className="button button-secondary button-large" to="/features">Explore features</Link>
+                <Link className="button button-secondary button-large" to="/features">
+                  View features
+                </Link>
               </div>
-              <p className="hero-note">Simple to understand. Fast to use. Built around your work.</p>
             </div>
 
             <div className="hero-panel" aria-label="Prolio workspace preview">
-              <div className="preview-topbar">
-                <span className="preview-label">Your workspace</span>
-                <span className="status-pill"><span /> Profile active</span>
-              </div>
-              <div className="preview-profile">
-                <div className="preview-avatar" aria-hidden="true">AR</div>
+              <h2>What you can do</h2>
+              <div className="simple-preview-list">
                 <div>
-                  <strong>Your professional profile</strong>
-                  <p>Projects, skills and experience in one place.</p>
+                  <strong>Create a portfolio</strong>
+                  <span>Share your profile, projects and skills.</span>
                 </div>
-              </div>
-              <div className="preview-progress">
-                <div className="progress-heading"><span>Profile strength</span><strong>80%</strong></div>
-                <div className="progress-track"><span /></div>
-              </div>
-              <div className="preview-cards">
-                <div><strong>Portfolio</strong><span>Ready to share</span></div>
-                <div><strong>Resume</strong><span>Build &amp; export</span></div>
-                <div><strong>ATS</strong><span>Check your match</span></div>
-                <div><strong>AI profile</strong><span>Answer with context</span></div>
+                <div>
+                  <strong>Build a resume</strong>
+                  <span>Create and export resumes from your data.</span>
+                </div>
+                <div>
+                  <strong>Check ATS score</strong>
+                  <span>Compare your resume with a job role.</span>
+                </div>
+                <div>
+                  <strong>Use recruiter tools</strong>
+                  <span>Search and compare candidate profiles.</span>
+                </div>
               </div>
             </div>
           </div>
@@ -76,14 +74,19 @@ function HomePage() {
         <section className="feature-section" aria-labelledby="feature-title">
           <div className="container">
             <div className="section-heading">
-              <p className="eyebrow">Designed for clarity</p>
-              <h2 id="feature-title">Everything important stays easy to find.</h2>
-              <p>No crowded menus, hidden actions or unnecessary animation. Each tool has a clear purpose.</p>
+              <p className="eyebrow">Main features</p>
+              <h2 id="feature-title">Simple tools for students and recruiters.</h2>
+              <p>
+                The platform keeps the important actions clear and easy to understand without too many menus or animations.
+              </p>
             </div>
-            <div className="feature-grid">
+
+            <div className="feature-grid feature-grid-three">
               {features.map(({ icon: Icon, title, copy }) => (
                 <article className="feature-card" key={title}>
-                  <span className="feature-icon"><Icon size={22} aria-hidden="true" /></span>
+                  <span className="feature-icon">
+                    <Icon size={22} aria-hidden="true" />
+                  </span>
                   <h3>{title}</h3>
                   <p>{copy}</p>
                 </article>
@@ -91,7 +94,21 @@ function HomePage() {
             </div>
           </div>
         </section>
+
+        <section className="home-cta">
+          <div className="container home-cta-inner">
+            <div>
+              <h2>Start building your professional profile.</h2>
+              <p>Create an account and keep your career information in one place.</p>
+            </div>
+            <Link className="button button-primary button-large" to="/register">
+              Create account
+            </Link>
+          </div>
+        </section>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }
