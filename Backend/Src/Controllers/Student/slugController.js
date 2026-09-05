@@ -1,4 +1,5 @@
 const User = require("../../Models/User");
+const subscriptionService = require("../../Services/subscriptionService");
 
 const {
   clearPublicPortfolioCache,
@@ -17,6 +18,27 @@ const updateSlug = async (req, res) => {
       });
     }
 
+    let subscription = await subscriptionService.getUserSubscription(userId);
+
+    if (!subscription) {
+      const currentUserForPlan = await User.findById(userId);
+      if (!currentUserForPlan) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+      await subscriptionService.createFreeSubscription(currentUserForPlan);
+      subscription = await subscriptionService.getUserSubscription(userId);
+    }
+
+    if (subscription?.limits?.custom_link !== true) {
+      return res.status(403).json({
+        success: false,
+        message: "Custom portfolio links are available on Student Pro",
+      });
+    }
+
     const normalizedSlug = slug
       .trim()
       .toLowerCase()
@@ -28,13 +50,11 @@ const updateSlug = async (req, res) => {
     if (normalizedSlug.length < 3) {
       return res.status(400).json({
         success: false,
-        message:
-          "Slug must be at least 3 characters long",
+        message: "Slug must be at least 3 characters long",
       });
     }
 
-    const currentUser =
-      await User.findById(userId);
+    const currentUser = await User.findById(userId);
 
     if (!currentUser) {
       return res.status(404).json({
@@ -43,54 +63,31 @@ const updateSlug = async (req, res) => {
       });
     }
 
-    const oldSlug =
-      currentUser.public_slug;
+    const oldSlug = currentUser.public_slug;
+    const existingUser = await User.findBySlug(normalizedSlug);
 
-    const existingUser =
-      await User.findBySlug(
-        normalizedSlug
-      );
-
-    if (
-      existingUser &&
-      existingUser.id !== userId
-    ) {
+    if (existingUser && existingUser.id !== userId) {
       return res.status(409).json({
         success: false,
-        message:
-          "This portfolio link is already taken",
+        message: "This portfolio link is already taken",
       });
     }
 
-    const user =
-      await User.updatePublicSlug(
-        userId,
-        normalizedSlug
-      );
+    const user = await User.updatePublicSlug(userId, normalizedSlug);
 
-    // CLEAR OLD SLUG CACHE
     if (oldSlug) {
-      await clearPublicPortfolioCache(
-        oldSlug
-      );
+      await clearPublicPortfolioCache(oldSlug);
     }
 
-    // CLEAR NEW SLUG CACHE TOO
-    await clearPublicPortfolioCache(
-      normalizedSlug
-    );
+    await clearPublicPortfolioCache(normalizedSlug);
 
     return res.status(200).json({
       success: true,
-      message:
-        "Portfolio link updated successfully",
+      message: "Portfolio link updated successfully",
       public_slug: user.public_slug,
     });
   } catch (error) {
-    console.error(
-      "UPDATE PUBLIC SLUG ERROR:",
-      error
-    );
+    console.error("UPDATE PUBLIC SLUG ERROR:", error);
 
     return res.status(500).json({
       success: false,
