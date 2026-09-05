@@ -1,4 +1,6 @@
 import {
+  ArrowRight,
+  CheckCircle2,
   ExternalLink,
   Github,
   Globe2,
@@ -6,10 +8,10 @@ import {
   MapPin,
   Save,
   UserRound,
+  X,
 } from "lucide-react";
-
-import { useEffect, useRef, useState } from "react";
-
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createStudentProfile,
   getStudentProfile,
@@ -27,27 +29,23 @@ const emptyForm = {
 };
 
 function PortfolioMaker() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState(emptyForm);
   const [profileExists, setProfileExists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const savedTimerRef = useRef(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
         setLoading(true);
         setError("");
-
         const data = await getStudentProfile();
 
         if (data?.profile) {
           const profile = data.profile;
-
           setFormData({
             headline: profile.headline || "",
             bio: profile.bio || "",
@@ -62,17 +60,13 @@ function PortfolioMaker() {
                   ? profile.isPublic
                   : true,
           });
-
           setProfileExists(true);
         }
       } catch (err) {
         if (err.response?.status === 404) {
           setProfileExists(false);
         } else {
-          setError(
-            err.response?.data?.message ||
-              "Unable to load your portfolio profile."
-          );
+          setError(err.response?.data?.message || "Unable to load your portfolio profile.");
         }
       } finally {
         setLoading(false);
@@ -80,45 +74,35 @@ function PortfolioMaker() {
     };
 
     loadProfile();
-
-    return () => {
-      if (savedTimerRef.current) {
-        window.clearTimeout(savedTimerRef.current);
-      }
-    };
   }, []);
+
+  useEffect(() => {
+    if (!showSuccessModal) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setShowSuccessModal(false);
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showSuccessModal]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
-
     setFormData((current) => ({
       ...current,
       [name]: type === "checkbox" ? checked : value,
     }));
-
     setError("");
-    setSuccess("");
-    setSaved(false);
-
-    if (savedTimerRef.current) {
-      window.clearTimeout(savedTimerRef.current);
-      savedTimerRef.current = null;
-    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (saving || saved) {
-      return;
-    }
-
-    const wasExistingProfile = profileExists;
+    if (saving) return;
 
     try {
       setSaving(true);
       setError("");
-      setSuccess("");
 
       const payload = {
         headline: formData.headline.trim() || null,
@@ -130,42 +114,23 @@ function PortfolioMaker() {
         isPublic: formData.isPublic,
       };
 
-      const data = wasExistingProfile
+      const data = profileExists
         ? await updateStudentProfile(payload)
         : await createStudentProfile(payload);
 
       if (data?.profile) {
         setProfileExists(true);
-        setSuccess(
-          wasExistingProfile
-            ? "Portfolio profile updated successfully."
-            : "Portfolio profile created successfully."
-        );
-        setSaved(true);
-
-        savedTimerRef.current = window.setTimeout(() => {
-          setSaved(false);
-          savedTimerRef.current = null;
-        }, 1500);
+        setShowSuccessModal(true);
       }
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Unable to save your portfolio profile."
-      );
+      setError(err.response?.data?.message || "Unable to save your portfolio profile.");
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="portfolio-maker-page">
-        <div className="portfolio-loading">
-          <p>Loading portfolio...</p>
-        </div>
-      </div>
-    );
+    return <div className="portfolio-maker-page"><div className="portfolio-loading"><p>Loading portfolio...</p></div></div>;
   }
 
   return (
@@ -173,232 +138,88 @@ function PortfolioMaker() {
       <section className="portfolio-page-heading">
         <div>
           <p className="eyebrow">Portfolio</p>
-
           <h1>Build your professional profile</h1>
-
-          <p>
-            Add the main information that will appear on your
-            portfolio and be used by other Prolio tools.
-          </p>
+          <p>Add the main information that will appear on your portfolio and be used by other Prolio tools.</p>
         </div>
       </section>
 
-      {error && (
-        <div className="portfolio-message portfolio-message-error">
-          {error}
-        </div>
-      )}
+      {error && <div className="portfolio-message portfolio-message-error">{error}</div>}
 
-      {success && (
-        <div className="portfolio-message portfolio-message-success">
-          {success}
-        </div>
-      )}
-
-      <form
-        className="portfolio-profile-form"
-        onSubmit={handleSubmit}
-      >
+      <form className="portfolio-profile-form" onSubmit={handleSubmit}>
         <section className="portfolio-form-card">
           <div className="portfolio-form-card-heading">
-            <span className="portfolio-section-icon">
-              <UserRound size={20} />
-            </span>
-
-            <div>
-              <h2>Basic profile</h2>
-
-              <p>
-                Add a short headline and introduction about yourself.
-              </p>
-            </div>
+            <span className="portfolio-section-icon"><UserRound size={20} /></span>
+            <div><h2>Basic profile</h2><p>Add a short headline and introduction about yourself.</p></div>
           </div>
-
           <div className="portfolio-form-content">
             <div className="form-group">
-              <label htmlFor="portfolio-headline">
-                Professional headline
-              </label>
-
-              <input
-                id="portfolio-headline"
-                name="headline"
-                type="text"
-                value={formData.headline}
-                onChange={handleChange}
-                placeholder="Example: B.Tech IT Student | Software Developer"
-                maxLength={160}
-              />
+              <label htmlFor="portfolio-headline">Professional headline</label>
+              <input id="portfolio-headline" name="headline" type="text" value={formData.headline} onChange={handleChange} placeholder="Example: B.Tech IT Student | Software Developer" maxLength={160} />
             </div>
-
             <div className="form-group">
               <label htmlFor="portfolio-bio">About you</label>
-
-              <textarea
-                id="portfolio-bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                placeholder="Write a short introduction about yourself, your interests and what you are building."
-                rows={6}
-                maxLength={1000}
-              />
-
-              <span className="portfolio-character-count">
-                {formData.bio.length}/1000
-              </span>
+              <textarea id="portfolio-bio" name="bio" value={formData.bio} onChange={handleChange} placeholder="Write a short introduction about yourself, your interests and what you are building." rows={6} maxLength={1000} />
+              <span className="portfolio-character-count">{formData.bio.length}/1000</span>
             </div>
-
             <div className="form-group">
-              <label htmlFor="portfolio-location">
-                Location
-              </label>
-
-              <div className="portfolio-input-icon">
-                <MapPin size={18} />
-
-                <input
-                  id="portfolio-location"
-                  name="location"
-                  type="text"
-                  value={formData.location}
-                  onChange={handleChange}
-                  placeholder="Example: Tamil Nadu, India"
-                />
-              </div>
+              <label htmlFor="portfolio-location">Location</label>
+              <div className="portfolio-input-icon"><MapPin size={18} /><input id="portfolio-location" name="location" type="text" value={formData.location} onChange={handleChange} placeholder="Example: Tamil Nadu, India" /></div>
             </div>
           </div>
         </section>
 
         <section className="portfolio-form-card">
           <div className="portfolio-form-card-heading">
-            <span className="portfolio-section-icon">
-              <Globe2 size={20} />
-            </span>
-
-            <div>
-              <h2>Links</h2>
-
-              <p>
-                Add websites and social profiles you want to show.
-              </p>
-            </div>
+            <span className="portfolio-section-icon"><Globe2 size={20} /></span>
+            <div><h2>Links</h2><p>Add websites and social profiles you want to show.</p></div>
           </div>
-
           <div className="portfolio-form-content">
-            <div className="form-group">
-              <label htmlFor="portfolio-website">
-                Website
-              </label>
-
-              <div className="portfolio-input-icon">
-                <ExternalLink size={18} />
-
-                <input
-                  id="portfolio-website"
-                  name="website"
-                  type="url"
-                  value={formData.website}
-                  onChange={handleChange}
-                  placeholder="https://yourwebsite.com"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="portfolio-linkedin">
-                LinkedIn
-              </label>
-
-              <div className="portfolio-input-icon">
-                <Linkedin size={18} />
-
-                <input
-                  id="portfolio-linkedin"
-                  name="linkedin"
-                  type="url"
-                  value={formData.linkedin}
-                  onChange={handleChange}
-                  placeholder="https://linkedin.com/in/username"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="portfolio-github">
-                GitHub
-              </label>
-
-              <div className="portfolio-input-icon">
-                <Github size={18} />
-
-                <input
-                  id="portfolio-github"
-                  name="github"
-                  type="url"
-                  value={formData.github}
-                  onChange={handleChange}
-                  placeholder="https://github.com/username"
-                />
-              </div>
-            </div>
+            <div className="form-group"><label htmlFor="portfolio-website">Website</label><div className="portfolio-input-icon"><ExternalLink size={18} /><input id="portfolio-website" name="website" type="url" value={formData.website} onChange={handleChange} placeholder="https://yourwebsite.com" /></div></div>
+            <div className="form-group"><label htmlFor="portfolio-linkedin">LinkedIn</label><div className="portfolio-input-icon"><Linkedin size={18} /><input id="portfolio-linkedin" name="linkedin" type="url" value={formData.linkedin} onChange={handleChange} placeholder="https://linkedin.com/in/username" /></div></div>
+            <div className="form-group"><label htmlFor="portfolio-github">GitHub</label><div className="portfolio-input-icon"><Github size={18} /><input id="portfolio-github" name="github" type="url" value={formData.github} onChange={handleChange} placeholder="https://github.com/username" /></div></div>
           </div>
         </section>
 
         <section className="portfolio-form-card">
           <div className="portfolio-form-card-heading">
-            <span className="portfolio-section-icon">
-              <Globe2 size={20} />
-            </span>
-
-            <div>
-              <h2>Portfolio visibility</h2>
-
-              <p>
-                Choose whether your portfolio can be viewed publicly.
-              </p>
-            </div>
+            <span className="portfolio-section-icon"><Globe2 size={20} /></span>
+            <div><h2>Portfolio visibility</h2><p>Choose whether your portfolio can be viewed publicly.</p></div>
           </div>
-
           <div className="portfolio-form-content">
             <label className="portfolio-visibility-option">
-              <input
-                name="isPublic"
-                type="checkbox"
-                checked={formData.isPublic}
-                onChange={handleChange}
-              />
-
-              <span>
-                <strong>Public portfolio</strong>
-
-                <small>
-                  Allow people with your portfolio link to view your
-                  public professional information.
-                </small>
-              </span>
+              <input name="isPublic" type="checkbox" checked={formData.isPublic} onChange={handleChange} />
+              <span><strong>Public portfolio</strong><small>Allow people with your portfolio link to view your public professional information.</small></span>
             </label>
           </div>
         </section>
 
         <div className="portfolio-form-actions">
-          <button
-            type="submit"
-            className="button button-primary"
-            disabled={saving || saved}
-          >
+          <button type="submit" className="button button-primary" disabled={saving}>
             <Save size={18} />
-
-            {saving
-              ? "Saving..."
-              : saved
-                ? "Saved"
-                : profileExists
-                  ? "Save changes"
-                  : "Create profile"}
+            {saving ? "Saving..." : profileExists ? "Save changes" : "Create profile"}
           </button>
         </div>
       </form>
+
+      {showSuccessModal && (
+        <div className="portfolio-modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowSuccessModal(false);
+        }}>
+          <section className="portfolio-success-modal" role="dialog" aria-modal="true" aria-labelledby="portfolio-success-title">
+            <button className="portfolio-modal-close" type="button" onClick={() => setShowSuccessModal(false)} aria-label="Close message"><X size={20} /></button>
+            <span className="portfolio-success-icon"><CheckCircle2 size={30} /></span>
+            <h2 id="portfolio-success-title">Profile saved successfully</h2>
+            <p>Your basic profile is saved. Next, add your projects, skills, education, experience and certificates to complete your portfolio.</p>
+            <div className="portfolio-modal-actions">
+              <button type="button" className="button button-ghost" onClick={() => setShowSuccessModal(false)}>Cancel</button>
+              <button type="button" className="button button-primary" onClick={() => {
+                setShowSuccessModal(false);
+                navigate("/student/portfolio#portfolio-details");
+              }}>Continue to portfolio details <ArrowRight size={17} /></button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
