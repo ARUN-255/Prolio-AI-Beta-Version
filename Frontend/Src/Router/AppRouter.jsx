@@ -11,6 +11,7 @@ import RoleRoute from "./RoleRoute";
 import StudentDashboard from "../Pages/Student/Dashboard";
 import PortfolioMaker from "../Pages/Student/PortfolioMaker";
 import AddProject from "../Pages/Student/AddProject";
+import AddSkill from "../Pages/Student/AddSkill";
 
 function PlaceholderPage({ title }) {
   return (
@@ -49,6 +50,7 @@ function AppRouter() {
         <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="portfolio" element={<PortfolioMaker />} />
         <Route path="portfolio/project/add" element={<AddProject />} />
+        <Route path="portfolio/skill/add" element={<AddSkill />} />
         <Route path="resumes" element={<PlaceholderPage title="Resumes" />} />
         <Route path="ats" element={<PlaceholderPage title="ATS Checker" />} />
       </Route>
