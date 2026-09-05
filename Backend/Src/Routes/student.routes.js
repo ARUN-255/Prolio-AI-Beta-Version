@@ -72,7 +72,7 @@ const {
 } = require("../Middleware/authMiddleware");
 
 const {
-  uploadResume,
+  handleResumeUpload,
 } = require("../Middleware/resumeUploadMiddleware");
 
 const {
@@ -151,7 +151,7 @@ router.post(
   "/ats/analyze-upload",
   protect,
   authorize("student"),
-  uploadResume.single("resume"),
+  handleResumeUpload,
   runUploadedAtsAnalysis
 );
 router.get("/ats", protect, authorize("student"), getAtsAnalyses);
