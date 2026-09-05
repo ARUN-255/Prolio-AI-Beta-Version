@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Plus,
   Save,
+  SkipForward,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -107,7 +108,7 @@ function AddExperience() {
         <div>
           <p className="eyebrow">Portfolio details</p>
           <h1>Add experience</h1>
-          <p>Add internships, jobs, freelance work or other relevant professional experience.</p>
+          <p>Add internships, jobs, freelance work or other relevant professional experience. If you do not have experience yet, you can skip this step.</p>
         </div>
       </section>
 
@@ -119,19 +120,19 @@ function AddExperience() {
             <span className="portfolio-section-icon"><BriefcaseBusiness size={20} /></span>
             <div>
               <h2>Experience details</h2>
-              <p>Company and role are required. Dates and description are optional.</p>
+              <p>Company and role are required only if you choose to add experience.</p>
             </div>
           </div>
 
           <div className="portfolio-form-content">
             <div className="form-group">
               <label htmlFor="experience-company">Company</label>
-              <input id="experience-company" name="company" type="text" value={formData.company} onChange={handleChange} placeholder="Example: OpenAI" maxLength={200} required />
+              <input id="experience-company" name="company" type="text" value={formData.company} onChange={handleChange} placeholder="Example: OpenAI" maxLength={200} />
             </div>
 
             <div className="form-group">
               <label htmlFor="experience-role">Role</label>
-              <input id="experience-role" name="role" type="text" value={formData.role} onChange={handleChange} placeholder="Example: Software Engineer Intern" maxLength={200} required />
+              <input id="experience-role" name="role" type="text" value={formData.role} onChange={handleChange} placeholder="Example: Software Engineer Intern" maxLength={200} />
             </div>
 
             <div className="form-row">
@@ -162,9 +163,12 @@ function AddExperience() {
           </div>
         </section>
 
-        <div className="portfolio-form-actions" style={{ gap: "10px" }}>
+        <div className="portfolio-form-actions" style={{ gap: "10px", flexWrap: "wrap" }}>
           <button type="button" className="button button-ghost" onClick={() => navigate("/student/portfolio/education/add")}>
             <ArrowLeft size={17} /> Back
+          </button>
+          <button type="button" className="button button-secondary" onClick={() => navigate("/student/portfolio/certificate/add")}>
+            <SkipForward size={17} /> Skip experience
           </button>
           <button type="submit" className="button button-primary" disabled={saving}>
             <Save size={18} /> {saving ? "Saving..." : "Save experience"}
