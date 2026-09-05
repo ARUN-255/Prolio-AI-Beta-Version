@@ -8,7 +8,7 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   createStudentProfile,
@@ -28,15 +28,14 @@ const emptyForm = {
 
 function PortfolioMaker() {
   const [formData, setFormData] = useState(emptyForm);
-
   const [profileExists, setProfileExists] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [saved, setSaved] = useState(false);
+
+  const savedTimerRef = useRef(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -81,6 +80,12 @@ function PortfolioMaker() {
     };
 
     loadProfile();
+
+    return () => {
+      if (savedTimerRef.current) {
+        window.clearTimeout(savedTimerRef.current);
+      }
+    };
   }, []);
 
   const handleChange = (event) => {
@@ -91,17 +96,24 @@ function PortfolioMaker() {
       [name]: type === "checkbox" ? checked : value,
     }));
 
-    if (error) {
-      setError("");
-    }
+    setError("");
+    setSuccess("");
+    setSaved(false);
 
-    if (success) {
-      setSuccess("");
+    if (savedTimerRef.current) {
+      window.clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = null;
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (saving || saved) {
+      return;
+    }
+
+    const wasExistingProfile = profileExists;
 
     try {
       setSaving(true);
@@ -116,32 +128,25 @@ function PortfolioMaker() {
         linkedin: formData.linkedin.trim() || null,
         github: formData.github.trim() || null,
         isPublic: formData.isPublic,
-
-        /*
-         * These fields are managed separately later.
-         * Sending them as undefined prevents accidental
-         * replacement of existing structured data.
-         */
-        education: undefined,
-        skills: undefined,
-        socialLinks: undefined,
       };
 
-      let data;
-
-      if (profileExists) {
-        data = await updateStudentProfile(payload);
-      } else {
-        data = await createStudentProfile(payload);
-        setProfileExists(true);
-      }
+      const data = wasExistingProfile
+        ? await updateStudentProfile(payload)
+        : await createStudentProfile(payload);
 
       if (data?.profile) {
+        setProfileExists(true);
         setSuccess(
-          profileExists
+          wasExistingProfile
             ? "Portfolio profile updated successfully."
             : "Portfolio profile created successfully."
         );
+        setSaved(true);
+
+        savedTimerRef.current = window.setTimeout(() => {
+          setSaved(false);
+          savedTimerRef.current = null;
+        }, 1500);
       }
     } catch (err) {
       setError(
@@ -380,15 +385,17 @@ function PortfolioMaker() {
           <button
             type="submit"
             className="button button-primary"
-            disabled={saving}
+            disabled={saving || saved}
           >
             <Save size={18} />
 
             {saving
               ? "Saving..."
-              : profileExists
-                ? "Save changes"
-                : "Create profile"}
+              : saved
+                ? "Saved"
+                : profileExists
+                  ? "Save changes"
+                  : "Create profile"}
           </button>
         </div>
       </form>
