@@ -5,6 +5,7 @@ const Experience = require("../Models/Experiences");
 const Education = require("../Models/Education");
 const Skill = require("../Models/Skill");
 const Certificate = require("../Models/Certificate");
+const subscriptionService = require("./subscriptionService");
 
 const {
   redisClient,
@@ -13,14 +14,9 @@ const {
 const buildPublicPortfolio = async (slug) => {
   const cacheKey = `public-portfolio:${slug}`;
 
-  // CHECK REDIS CACHE FIRST
   if (redisClient.isReady) {
-    const cachedPortfolio =
-      await redisClient.get(cacheKey);
-
-    if (cachedPortfolio) {
-      return JSON.parse(cachedPortfolio);
-    }
+    const cachedPortfolio = await redisClient.get(cacheKey);
+    if (cachedPortfolio) return JSON.parse(cachedPortfolio);
   }
 
   const user = await User.findBySlug(slug);
@@ -30,21 +26,22 @@ const buildPublicPortfolio = async (slug) => {
   }
 
   const userId = user.id;
-
-  const profile =
-    await StudentProfile.findByUserId(userId);
+  const profile = await StudentProfile.findByUserId(userId);
 
   if (!profile || !profile.is_public) {
     return null;
   }
 
-  const [
-    projects,
-    experiences,
-    education,
-    skills,
-    certificates,
-  ] = await Promise.all([
+  let subscription = await subscriptionService.getUserSubscription(userId);
+
+  if (!subscription) {
+    await subscriptionService.createFreeSubscription(user);
+    subscription = await subscriptionService.getUserSubscription(userId);
+  }
+
+  const limits = subscription?.limits || {};
+
+  const [projects, experiences, education, skills, certificates] = await Promise.all([
     Project.findAllByUserId(userId),
     Experience.findAllByUserId(userId),
     Education.findAllByUserId(userId),
@@ -106,7 +103,12 @@ const buildPublicPortfolio = async (slug) => {
       name: user.name,
       public_slug: user.public_slug,
     },
-
+    plan: {
+      name: subscription?.plan_name || "Student Free",
+      portfolio_watermark: limits.portfolio_watermark !== false,
+      custom_link: limits.custom_link === true,
+      custom_domain: limits.custom_domain === true,
+    },
     profile: {
       headline: profile.headline,
       bio: profile.bio,
@@ -118,7 +120,6 @@ const buildPublicPortfolio = async (slug) => {
       skills: profile.skills,
       social_links: profile.social_links,
     },
-
     projects: publicProjects,
     experiences: publicExperiences,
     education: publicEducation,
@@ -126,33 +127,21 @@ const buildPublicPortfolio = async (slug) => {
     certificates: publicCertificates,
   };
 
-  // STORE IN REDIS FOR 5 MINUTES
   if (redisClient.isReady) {
-    await redisClient.set(
-      cacheKey,
-      JSON.stringify(portfolio),
-      {
-        EX: 300,
-      }
-    );
+    await redisClient.set(cacheKey, JSON.stringify(portfolio), { EX: 300 });
   }
 
   return portfolio;
 };
 
-const getPublicPortfolioOwnerId = async (
-  slug
-) => {
+const getPublicPortfolioOwnerId = async (slug) => {
   const user = await User.findBySlug(slug);
 
   if (!user || user.role !== "student") {
     return null;
   }
 
-  const profile =
-    await StudentProfile.findByUserId(
-      user.id
-    );
+  const profile = await StudentProfile.findByUserId(user.id);
 
   if (!profile || !profile.is_public) {
     return null;
