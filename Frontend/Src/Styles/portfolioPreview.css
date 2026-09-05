@@ -1,3 +1,5 @@
+@import "./portfolioSharing.css";
+
 .portfolio-preview-page {
   display: flex;
   flex-direction: column;
