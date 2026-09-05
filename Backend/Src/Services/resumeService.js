@@ -1,3 +1,4 @@
+const User = require("../Models/User");
 const StudentProfile = require("../Models/StudentProfile");
 const Project = require("../Models/Project");
 const Experience = require("../Models/Experiences");
@@ -8,6 +9,7 @@ const Certificate = require("../Models/Certificate");
 // BUILD RESUME DATA FROM EXISTING PORTFOLIO
 const buildResumeDataFromPortfolio = async (userId) => {
   const [
+    user,
     profile,
     projects,
     experiences,
@@ -15,6 +17,7 @@ const buildResumeDataFromPortfolio = async (userId) => {
     skills,
     certificates,
   ] = await Promise.all([
+    User.findById(userId),
     StudentProfile.findByUserId(userId),
     Project.findAllByUserId(userId),
     Experience.findAllByUserId(userId),
@@ -25,6 +28,7 @@ const buildResumeDataFromPortfolio = async (userId) => {
 
   return {
     personal_info: {
+      name: user?.name || "",
       headline: profile?.headline || "",
       location: profile?.location || "",
       website: profile?.website || "",
@@ -81,6 +85,8 @@ const buildResumeDataFromPortfolio = async (userId) => {
       "skills",
       "certificates",
     ],
+
+    hidden_sections: [],
   };
 };
 
