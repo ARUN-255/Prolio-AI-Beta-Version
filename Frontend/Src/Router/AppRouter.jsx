@@ -21,6 +21,7 @@ import PortfolioPreview from "../Pages/Student/PortfolioPreview";
 import Resumes from "../Pages/Student/Resumes";
 import CreateResume from "../Pages/Student/CreateResume";
 import ResumeEditor from "../Pages/Student/ResumeEditor";
+import ATSChecker from "../Pages/Student/ATSChecker";
 
 function PlaceholderPage({ title }) {
   return (
@@ -69,7 +70,7 @@ function AppRouter() {
         <Route path="resumes" element={<Resumes />} />
         <Route path="resumes/new" element={<CreateResume />} />
         <Route path="resumes/:id" element={<ResumeEditor />} />
-        <Route path="ats" element={<PlaceholderPage title="ATS Checker" />} />
+        <Route path="ats" element={<ATSChecker />} />
       </Route>
 
       <Route
