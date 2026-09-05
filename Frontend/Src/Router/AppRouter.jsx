@@ -10,6 +10,7 @@ import RoleRoute from "./RoleRoute";
 
 import StudentDashboard from "../Pages/Student/Dashboard";
 import PortfolioMaker from "../Pages/Student/PortfolioMaker";
+import AddProject from "../Pages/Student/AddProject";
 
 function PlaceholderPage({ title }) {
   return (
@@ -24,47 +25,15 @@ function PlaceholderPage({ title }) {
 function AppRouter() {
   return (
     <Routes>
-      {/* =====================================================
-          Public Routes
-          ===================================================== */}
-
       <Route path="/" element={<HomePage />} />
-
-      <Route
-        path="/welcome"
-        element={<Navigate to="/" replace />}
-      />
-
-      <Route
-        path="/features"
-        element={<PlaceholderPage title="Features" />}
-      />
-
-      <Route
-        path="/students"
-        element={<PlaceholderPage title="For Students" />}
-      />
-
-      <Route
-        path="/recruiters"
-        element={<PlaceholderPage title="For Recruiters" />}
-      />
-
-      <Route
-        path="/pricing"
-        element={<PlaceholderPage title="Pricing" />}
-      />
-
-      {/* =====================================================
-          Authentication
-          ===================================================== */}
+      <Route path="/welcome" element={<Navigate to="/" replace />} />
+      <Route path="/features" element={<PlaceholderPage title="Features" />} />
+      <Route path="/students" element={<PlaceholderPage title="For Students" />} />
+      <Route path="/recruiters" element={<PlaceholderPage title="For Recruiters" />} />
+      <Route path="/pricing" element={<PlaceholderPage title="Pricing" />} />
 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Signup />} />
-
-      {/* =====================================================
-          Student Protected Area
-          ===================================================== */}
 
       <Route
         path="/student"
@@ -76,35 +45,13 @@ function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route
-          index
-          element={<Navigate to="dashboard" replace />}
-        />
-
-        <Route
-          path="dashboard"
-          element={<StudentDashboard />}
-        />
-
-        <Route
-          path="portfolio"
-          element={<PortfolioMaker />}
-        />
-
-        <Route
-          path="resumes"
-          element={<PlaceholderPage title="Resumes" />}
-        />
-
-        <Route
-          path="ats"
-          element={<PlaceholderPage title="ATS Checker" />}
-        />
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<StudentDashboard />} />
+        <Route path="portfolio" element={<PortfolioMaker />} />
+        <Route path="portfolio/project/add" element={<AddProject />} />
+        <Route path="resumes" element={<PlaceholderPage title="Resumes" />} />
+        <Route path="ats" element={<PlaceholderPage title="ATS Checker" />} />
       </Route>
-
-      {/* =====================================================
-          Recruiter Protected Area
-          ===================================================== */}
 
       <Route
         path="/recruiter"
@@ -116,33 +63,13 @@ function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route
-          index
-          element={<Navigate to="dashboard" replace />}
-        />
-
-        <Route
-          path="dashboard"
-          element={<PlaceholderPage title="Recruiter Dashboard" />}
-        />
-
-        <Route
-          path="candidates"
-          element={<PlaceholderPage title="Candidates" />}
-        />
-
-        <Route
-          path="compare"
-          element={<PlaceholderPage title="Resume Comparison" />}
-        />
-
-        <Route
-          path="jobs"
-          element={<PlaceholderPage title="Jobs" />}
-        />
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<PlaceholderPage title="Recruiter Dashboard" />} />
+        <Route path="candidates" element={<PlaceholderPage title="Candidates" />} />
+        <Route path="compare" element={<PlaceholderPage title="Resume Comparison" />} />
+        <Route path="jobs" element={<PlaceholderPage title="Jobs" />} />
       </Route>
 
-      {/* Unknown route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
