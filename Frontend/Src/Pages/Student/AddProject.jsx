@@ -20,6 +20,13 @@ const emptyProject = {
   isPublic: true,
 };
 
+const normalizeLink = (value) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
 function AddProject() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(emptyProject);
@@ -52,29 +59,50 @@ function AddProject() {
 
     if (saving) return;
 
-    if (!formData.title.trim()) {
+    const title = formData.title.trim();
+
+    if (!title) {
       setError("Project title is required.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
+    }
+
+    const normalizedLink = normalizeLink(formData.link);
+
+    if (normalizedLink) {
+      try {
+        new URL(normalizedLink);
+      } catch {
+        setError("Enter a valid project or GitHub link.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
     }
 
     try {
       setSaving(true);
       setError("");
 
-      await createProject({
-        title: formData.title.trim(),
+      const response = await createProject({
+        title,
         description: formData.description.trim() || null,
         tech_stack: formData.techStack
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
-        link: formData.link.trim() || null,
+        link: normalizedLink,
         is_public: formData.isPublic,
       });
 
-      setShowSuccessModal(true);
+      if (response?.success) {
+        setShowSuccessModal(true);
+      } else {
+        setError(response?.message || "Unable to save project.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Unable to save project.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
     }
@@ -99,7 +127,7 @@ function AddProject() {
 
       {error && <div className="portfolio-message portfolio-message-error">{error}</div>}
 
-      <form className="portfolio-profile-form" onSubmit={handleSubmit}>
+      <form className="portfolio-profile-form" onSubmit={handleSubmit} noValidate>
         <section className="portfolio-form-card">
           <div className="portfolio-form-card-heading">
             <span className="portfolio-section-icon"><FolderPlus size={20} /></span>
@@ -112,7 +140,7 @@ function AddProject() {
           <div className="portfolio-form-content">
             <div className="form-group">
               <label htmlFor="project-title">Project title</label>
-              <input id="project-title" name="title" type="text" value={formData.title} onChange={handleChange} placeholder="Example: Prolio AI" maxLength={160} required />
+              <input id="project-title" name="title" type="text" value={formData.title} onChange={handleChange} placeholder="Example: Prolio AI" maxLength={160} />
             </div>
 
             <div className="form-group">
@@ -128,7 +156,8 @@ function AddProject() {
 
             <div className="form-group">
               <label htmlFor="project-link">Project or GitHub link</label>
-              <input id="project-link" name="link" type="url" value={formData.link} onChange={handleChange} placeholder="https://github.com/username/project" />
+              <input id="project-link" name="link" type="text" inputMode="url" value={formData.link} onChange={handleChange} placeholder="github.com/username/project" />
+              <small>You can enter the link with or without https://</small>
             </div>
 
             <label className="portfolio-visibility-option">
