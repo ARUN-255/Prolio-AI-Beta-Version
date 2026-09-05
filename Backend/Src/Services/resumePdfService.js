@@ -2,6 +2,35 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 
+const DEFAULT_ORDER = [
+  "summary",
+  "experience",
+  "projects",
+  "education",
+  "skills",
+  "certificates",
+];
+
+const safeText = (value) => {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+};
+
+const writeSectionTitle = (doc, title) => {
+  doc.moveDown(0.5);
+  doc.font("Helvetica-Bold").fontSize(14).text(title);
+  doc.moveDown(0.2);
+  doc.font("Helvetica");
+};
+
+const writeEntry = (doc, heading, subheading, description, extra) => {
+  if (heading) doc.font("Helvetica-Bold").fontSize(11).text(heading);
+  if (subheading) doc.font("Helvetica").fontSize(10).text(subheading);
+  if (description) doc.font("Helvetica").fontSize(9.5).text(description);
+  if (extra) doc.font("Helvetica-Oblique").fontSize(9).text(extra);
+  doc.font("Helvetica").moveDown(0.45);
+};
+
 const generateResumePdf = async (resume) => {
   return new Promise((resolve, reject) => {
     try {
@@ -20,157 +49,152 @@ const generateResumePdf = async (resume) => {
       });
 
       const stream = fs.createWriteStream(filePath);
-
       doc.pipe(stream);
 
       const data = resume.resume_data || {};
+      const personal = data.personal_info || {};
+      const hiddenSections = Array.isArray(data.hidden_sections)
+        ? data.hidden_sections
+        : [];
+      const savedOrder = Array.isArray(data.section_order)
+        ? data.section_order
+        : [];
+      const sectionOrder = [
+        ...savedOrder.filter((name) => DEFAULT_ORDER.includes(name)),
+        ...DEFAULT_ORDER.filter((name) => !savedOrder.includes(name)),
+      ].filter((name) => !hiddenSections.includes(name));
 
-      // PERSONAL INFO
-      if (data.personal_info) {
-        doc
-          .fontSize(22)
-          .text(data.personal_info.name || "Resume", {
-            align: "center",
-          });
+      const name = safeText(personal.name) || "Resume";
+      doc.font("Helvetica-Bold").fontSize(22).text(name, { align: "center" });
 
-        if (data.personal_info.headline) {
-          doc
-            .fontSize(12)
-            .text(data.personal_info.headline, {
-              align: "center",
-            });
+      const headline = safeText(personal.headline);
+      if (headline) {
+        doc.font("Helvetica").fontSize(11).text(headline, { align: "center" });
+      }
+
+      const contactParts = [
+        safeText(personal.location),
+        safeText(personal.website),
+        safeText(personal.linkedin),
+        safeText(personal.github),
+      ].filter(Boolean);
+
+      if (contactParts.length > 0) {
+        doc.moveDown(0.25);
+        doc.font("Helvetica").fontSize(8.5).text(contactParts.join("  |  "), {
+          align: "center",
+        });
+      }
+
+      doc.moveDown(0.7);
+
+      sectionOrder.forEach((sectionName) => {
+        if (sectionName === "summary") {
+          const summary = safeText(data.summary);
+          if (!summary) return;
+          writeSectionTitle(doc, "Summary");
+          doc.font("Helvetica").fontSize(10).text(summary);
+          return;
         }
 
-        doc.moveDown();
-      }
+        if (sectionName === "skills") {
+          const skills = Array.isArray(data.skills) ? data.skills : [];
+          if (skills.length === 0) return;
+          writeSectionTitle(doc, "Skills");
+          const text = skills
+            .map((skill) => {
+              if (typeof skill === "string") return safeText(skill);
+              const nameText = safeText(skill?.name);
+              const proficiency = safeText(skill?.proficiency);
+              return proficiency ? `${nameText} (${proficiency})` : nameText;
+            })
+            .filter(Boolean)
+            .join("  •  ");
+          if (text) doc.font("Helvetica").fontSize(10).text(text);
+          return;
+        }
 
-      // SUMMARY
-      if (data.summary) {
-        doc.fontSize(16).text("Summary");
-        doc.moveDown(0.3);
-
-        doc.fontSize(11).text(data.summary);
-
-        doc.moveDown();
-      }
-
-      // SKILLS
-      if (Array.isArray(data.skills) && data.skills.length > 0) {
-        doc.fontSize(16).text("Skills");
-        doc.moveDown(0.3);
-
-        doc.fontSize(11).text(data.skills.join(" • "));
-
-        doc.moveDown();
-      }
-
-      // EXPERIENCE
-      if (
-        Array.isArray(data.experience) &&
-        data.experience.length > 0
-      ) {
-        doc.fontSize(16).text("Experience");
-        doc.moveDown(0.3);
-
-        data.experience.forEach((experience) => {
-          doc
-            .fontSize(12)
-            .text(
-              experience.role ||
-                experience.title ||
-                "Experience"
+        if (sectionName === "experience") {
+          const items = Array.isArray(data.experience) ? data.experience : [];
+          if (items.length === 0) return;
+          writeSectionTitle(doc, "Experience");
+          items.forEach((item) => {
+            const dates = [
+              safeText(item.start_date),
+              item.is_current ? "Present" : safeText(item.end_date),
+            ].filter(Boolean).join(" - ");
+            writeEntry(
+              doc,
+              safeText(item.role) || "Experience",
+              safeText(item.company),
+              safeText(item.description),
+              dates
             );
+          });
+          return;
+        }
 
-          if (experience.company) {
-            doc.fontSize(11).text(experience.company);
-          }
-
-          if (experience.description) {
-            doc
-              .fontSize(10)
-              .text(experience.description);
-          }
-
-          doc.moveDown(0.7);
-        });
-      }
-
-      // PROJECTS
-      if (
-        Array.isArray(data.projects) &&
-        data.projects.length > 0
-      ) {
-        doc.fontSize(16).text("Projects");
-        doc.moveDown(0.3);
-
-        data.projects.forEach((project) => {
-          doc
-            .fontSize(12)
-            .text(project.title || project.name || "Project");
-
-          if (project.description) {
-            doc
-              .fontSize(10)
-              .text(project.description);
-          }
-
-          doc.moveDown(0.7);
-        });
-      }
-
-      // EDUCATION
-      if (
-        Array.isArray(data.education) &&
-        data.education.length > 0
-      ) {
-        doc.fontSize(16).text("Education");
-        doc.moveDown(0.3);
-
-        data.education.forEach((education) => {
-          doc
-            .fontSize(12)
-            .text(
-              education.degree ||
-                education.course ||
-                "Education"
+        if (sectionName === "projects") {
+          const items = Array.isArray(data.projects) ? data.projects : [];
+          if (items.length === 0) return;
+          writeSectionTitle(doc, "Projects");
+          items.forEach((item) => {
+            const tech = Array.isArray(item.tech_stack)
+              ? item.tech_stack.filter(Boolean).join(" • ")
+              : safeText(item.tech_stack);
+            const extra = [tech, safeText(item.link)].filter(Boolean).join("  |  ");
+            writeEntry(
+              doc,
+              safeText(item.title) || "Project",
+              "",
+              safeText(item.description),
+              extra
             );
+          });
+          return;
+        }
 
-          if (education.institution) {
-            doc
-              .fontSize(11)
-              .text(education.institution);
-          }
-
-          doc.moveDown(0.7);
-        });
-      }
-
-      // CERTIFICATES
-      if (
-        Array.isArray(data.certificates) &&
-        data.certificates.length > 0
-      ) {
-        doc.fontSize(16).text("Certificates");
-        doc.moveDown(0.3);
-
-        data.certificates.forEach((certificate) => {
-          doc
-            .fontSize(11)
-            .text(
-              certificate.title ||
-                certificate.name ||
-                "Certificate"
+        if (sectionName === "education") {
+          const items = Array.isArray(data.education) ? data.education : [];
+          if (items.length === 0) return;
+          writeSectionTitle(doc, "Education");
+          items.forEach((item) => {
+            const degree = [safeText(item.degree), safeText(item.field_of_study)]
+              .filter(Boolean)
+              .join(" - ");
+            const years = [safeText(item.start_year), safeText(item.end_year)]
+              .filter(Boolean)
+              .join(" - ");
+            const extra = [years, safeText(item.grade)].filter(Boolean).join("  |  ");
+            writeEntry(
+              doc,
+              degree || "Education",
+              safeText(item.institution),
+              safeText(item.description),
+              extra
             );
+          });
+          return;
+        }
 
-          if (certificate.issuer) {
-            doc
-              .fontSize(10)
-              .text(certificate.issuer);
-          }
-
-          doc.moveDown(0.5);
-        });
-      }
+        if (sectionName === "certificates") {
+          const items = Array.isArray(data.certificates) ? data.certificates : [];
+          if (items.length === 0) return;
+          writeSectionTitle(doc, "Certificates");
+          items.forEach((item) => {
+            const extra = [safeText(item.date), safeText(item.file_url)]
+              .filter(Boolean)
+              .join("  |  ");
+            writeEntry(
+              doc,
+              safeText(item.title) || "Certificate",
+              safeText(item.issuer),
+              "",
+              extra
+            );
+          });
+        }
+      });
 
       doc.end();
 
