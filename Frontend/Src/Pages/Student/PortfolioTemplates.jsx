@@ -34,7 +34,7 @@ function PortfolioTemplates() {
 
   const handleContinue = () => {
     localStorage.setItem("prolio_portfolio_template", selectedTemplate);
-    navigate("/student/portfolio");
+    navigate("/student/portfolio/preview");
   };
 
   return (
