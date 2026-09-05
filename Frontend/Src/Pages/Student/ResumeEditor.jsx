@@ -40,9 +40,15 @@ function ResumeEditor() {
 
   const order = resumeData.section_order || DEFAULT_ORDER;
   const hidden = resumeData.hidden_sections || [];
+  const personal = resumeData.personal_info || {};
 
   const updatePersonal = (key, value) => setResumeData((current) => ({ ...current, personal_info: { ...(current.personal_info || {}), [key]: value } }));
   const updateSummary = (value) => setResumeData((current) => ({ ...current, summary: value }));
+  const updateItem = (section, index, key, value) => setResumeData((current) => {
+    const items = [...(current[section] || [])];
+    items[index] = { ...items[index], [key]: value };
+    return { ...current, [section]: items };
+  });
 
   const moveSection = (name, direction) => {
     const currentIndex = order.indexOf(name);
@@ -91,15 +97,33 @@ function ResumeEditor() {
     finally { setDownloading(false); }
   };
 
-  const personal = resumeData.personal_info || {};
   const visibleOrder = useMemo(() => order.filter((name) => !hidden.includes(name)), [order, hidden]);
 
+  const Editable = ({ value, onChange, className = "", multiline = false, placeholder = "Click to edit" }) => {
+    const props = {
+      className: `resume-inline-edit ${className}`,
+      value: value || "",
+      onChange: (e) => onChange(e.target.value),
+      placeholder,
+      spellCheck: true,
+    };
+    return multiline ? <textarea {...props} rows="2" /> : <input {...props} />;
+  };
+
   const renderSection = (name) => {
-    if (name === "summary") return resumeData.summary ? <section><h2>Summary</h2><p>{resumeData.summary}</p></section> : null;
+    if (name === "summary") return <section><h2>Summary</h2><Editable multiline value={resumeData.summary} onChange={updateSummary} className="resume-inline-paragraph" placeholder="Write your professional summary" /></section>;
     const items = resumeData[name] || [];
     if (!Array.isArray(items) || items.length === 0) return null;
+
     return <section><h2>{LABELS[name]}</h2>{items.map((item, index) => <div className="resume-preview-entry" key={`${name}-${index}`}>
-      {name === "skills" ? <p>{item.name}{item.proficiency ? ` · ${item.proficiency}` : ""}</p> : <><h3>{item.role || item.title || item.degree || item.institution}</h3><p>{item.company || item.issuer || item.institution || item.field_of_study || ""}</p>{item.description && <p>{item.description}</p>}{Array.isArray(item.tech_stack) && item.tech_stack.length > 0 && <small>{item.tech_stack.join(" · ")}</small>}</>}
+      {name === "skills" ? <div className="resume-inline-row"><Editable value={item.name} onChange={(v) => updateItem(name,index,"name",v)} placeholder="Skill" />{item.proficiency !== undefined && <Editable value={item.proficiency} onChange={(v) => updateItem(name,index,"proficiency",v)} placeholder="Proficiency" />}</div> : <>
+        {name === "experience" && <><Editable className="resume-inline-heading" value={item.role} onChange={(v) => updateItem(name,index,"role",v)} placeholder="Role"/><Editable value={item.company} onChange={(v) => updateItem(name,index,"company",v)} placeholder="Company"/></>}
+        {name === "projects" && <><Editable className="resume-inline-heading" value={item.title} onChange={(v) => updateItem(name,index,"title",v)} placeholder="Project title"/><Editable multiline value={item.description} onChange={(v) => updateItem(name,index,"description",v)} placeholder="Project description"/></>}
+        {name === "education" && <><Editable className="resume-inline-heading" value={item.degree} onChange={(v) => updateItem(name,index,"degree",v)} placeholder="Degree"/><Editable value={item.institution} onChange={(v) => updateItem(name,index,"institution",v)} placeholder="Institution"/><Editable value={item.field_of_study} onChange={(v) => updateItem(name,index,"field_of_study",v)} placeholder="Field of study"/></>}
+        {name === "certificates" && <><Editable className="resume-inline-heading" value={item.title} onChange={(v) => updateItem(name,index,"title",v)} placeholder="Certificate"/><Editable value={item.issuer} onChange={(v) => updateItem(name,index,"issuer",v)} placeholder="Issuer"/></>}
+        {name === "experience" && <Editable multiline value={item.description} onChange={(v) => updateItem(name,index,"description",v)} placeholder="Describe your work"/>}
+        {name === "projects" && Array.isArray(item.tech_stack) && <Editable value={item.tech_stack.join(", ")} onChange={(v) => updateItem(name,index,"tech_stack",v.split(",").map((x)=>x.trim()).filter(Boolean))} placeholder="React, Node.js, PostgreSQL"/>}
+      </>}
     </div>)}</section>;
   };
 
@@ -113,12 +137,10 @@ function ResumeEditor() {
       <aside className="resume-editor-panel">
         <p className="eyebrow">Resume editor</p>
         <label>Resume title<input value={title} onChange={(e) => setTitle(e.target.value)}/></label>
-        <label>Headline<input value={personal.headline || ""} onChange={(e) => updatePersonal("headline", e.target.value)}/></label>
-        <label>Location<input value={personal.location || ""} onChange={(e) => updatePersonal("location", e.target.value)}/></label>
-        <label>Summary<textarea rows="5" value={resumeData.summary || ""} onChange={(e) => updateSummary(e.target.value)}/></label>
+        <p className="resume-editor-note">Edit the resume by clicking directly on its text. Use this panel to arrange or hide sections.</p>
         <div><div className="resume-arrange-heading"><strong>Arrange sections</strong><small>Drag or use arrows</small></div><div className="resume-section-sorter">{order.map((name, index) => <div key={name} className={`resume-sort-item ${draggedSection === name ? "dragging" : ""}`} draggable onDragStart={() => setDraggedSection(name)} onDragOver={(e) => e.preventDefault()} onDrop={() => dropSection(name)}><GripVertical size={17}/><span>{LABELS[name]}</span><button type="button" title="Move up" disabled={index === 0} onClick={() => moveSection(name,-1)}><ArrowUp size={14}/></button><button type="button" title="Move down" disabled={index === order.length-1} onClick={() => moveSection(name,1)}><ArrowDown size={14}/></button><button type="button" title={hidden.includes(name) ? "Show section" : "Hide section"} onClick={() => toggleSection(name)}>{hidden.includes(name) ? <EyeOff size={15}/> : <Eye size={15}/>}</button></div>)}</div></div>
       </aside>
-      <section className="resume-document-preview"><div className="resume-paper"><h1>{personal.name || "Your Name"}</h1><p className="resume-paper-headline">{personal.headline || "Professional headline"}</p>{personal.location && <p className="resume-paper-contact">{personal.location}</p>}<div className="resume-paper-sections">{visibleOrder.map((name) => <div key={name}>{renderSection(name)}</div>)}</div></div></section>
+      <section className="resume-document-preview"><div className="resume-paper resume-paper-editable"><Editable className="resume-inline-name" value={personal.name} onChange={(v) => updatePersonal("name",v)} placeholder="Your Name"/><Editable className="resume-inline-headline" value={personal.headline} onChange={(v) => updatePersonal("headline",v)} placeholder="Professional headline"/><Editable className="resume-inline-contact" value={personal.location} onChange={(v) => updatePersonal("location",v)} placeholder="Location"/><div className="resume-paper-sections">{visibleOrder.map((name) => <div key={name}>{renderSection(name)}</div>)}</div></div></section>
     </div>
   </div>;
 }
