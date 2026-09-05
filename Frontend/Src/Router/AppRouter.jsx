@@ -4,6 +4,7 @@ import DashboardLayout from "../Components/Layout/DashboardLayout";
 import HomePage from "../Pages/Home/HomePage";
 import Login from "../Pages/Public/Login";
 import Signup from "../Pages/Public/Signup";
+import PublicProfile from "../Pages/Public/PublicProfile";
 
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
@@ -37,6 +38,7 @@ function AppRouter() {
       <Route path="/students" element={<PlaceholderPage title="For Students" />} />
       <Route path="/recruiters" element={<PlaceholderPage title="For Recruiters" />} />
       <Route path="/pricing" element={<PlaceholderPage title="Pricing" />} />
+      <Route path="/p/:slug" element={<PublicProfile />} />
 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Signup />} />
