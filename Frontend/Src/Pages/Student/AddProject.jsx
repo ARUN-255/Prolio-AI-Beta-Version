@@ -1,7 +1,16 @@
-import { ArrowLeft, FolderPlus, Save } from "lucide-react";
-import { useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  FolderPlus,
+  Plus,
+  Save,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createProject } from "../../Services/portfolioService";
+import "../../Styles/portfolioModal.css";
 
 const emptyProject = {
   title: "",
@@ -16,6 +25,18 @@ function AddProject() {
   const [formData, setFormData] = useState(emptyProject);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  useEffect(() => {
+    if (!showSuccessModal) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setShowSuccessModal(false);
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showSuccessModal]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -28,6 +49,8 @@ function AddProject() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (saving) return;
 
     if (!formData.title.trim()) {
       setError("Project title is required.");
@@ -49,12 +72,19 @@ function AddProject() {
         is_public: formData.isPublic,
       });
 
-      navigate("/student/portfolio", { replace: true });
+      setShowSuccessModal(true);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to save project.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const addAnotherProject = () => {
+    setShowSuccessModal(false);
+    setFormData(emptyProject);
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -63,7 +93,7 @@ function AddProject() {
         <div>
           <p className="eyebrow">Portfolio details</p>
           <h1>Add a project</h1>
-          <p>Add one of your strongest projects first. You can add more portfolio sections after this.</p>
+          <p>Add one of your strongest projects first. You can add more projects or continue to your skills after saving.</p>
         </div>
       </section>
 
@@ -120,6 +150,34 @@ function AddProject() {
           </button>
         </div>
       </form>
+
+      {showSuccessModal && (
+        <div
+          className="portfolio-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowSuccessModal(false);
+          }}
+        >
+          <section className="portfolio-success-modal" role="dialog" aria-modal="true" aria-labelledby="project-success-title">
+            <button className="portfolio-modal-close" type="button" onClick={() => setShowSuccessModal(false)} aria-label="Close message">
+              <X size={20} />
+            </button>
+            <span className="portfolio-success-icon"><CheckCircle2 size={30} /></span>
+            <h2 id="project-success-title">Project saved successfully</h2>
+            <p>Your project is now part of your portfolio. You can add another project or continue to add your skills.</p>
+            <div className="portfolio-modal-actions portfolio-modal-actions-stacked-mobile">
+              <button type="button" className="button button-ghost" onClick={() => setShowSuccessModal(false)}>Cancel</button>
+              <button type="button" className="button button-secondary" onClick={addAnotherProject}>
+                <Plus size={17} /> Add another project
+              </button>
+              <button type="button" className="button button-primary" onClick={() => navigate("/student/portfolio/skill/add")}>
+                Continue to skills <ArrowRight size={17} />
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
