@@ -10,7 +10,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createStudentProfile,
@@ -29,9 +29,20 @@ const emptyForm = {
   isPublic: true,
 };
 
+const normalizeForm = (form) => ({
+  headline: form.headline || "",
+  bio: form.bio || "",
+  location: form.location || "",
+  website: form.website || "",
+  linkedin: form.linkedin || "",
+  github: form.github || "",
+  isPublic: Boolean(form.isPublic),
+});
+
 function PortfolioMaker() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(emptyForm);
+  const [savedFormData, setSavedFormData] = useState(emptyForm);
   const [profileExists, setProfileExists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,7 +58,7 @@ function PortfolioMaker() {
 
         if (data?.profile) {
           const profile = data.profile;
-          setFormData({
+          const loadedForm = {
             headline: profile.headline || "",
             bio: profile.bio || "",
             location: profile.location || "",
@@ -60,12 +71,16 @@ function PortfolioMaker() {
                 : typeof profile.isPublic === "boolean"
                   ? profile.isPublic
                   : true,
-          });
+          };
+
+          setFormData(loadedForm);
+          setSavedFormData(loadedForm);
           setProfileExists(true);
         }
       } catch (err) {
         if (err.response?.status === 404) {
           setProfileExists(false);
+          setSavedFormData(emptyForm);
         } else {
           setError(err.response?.data?.message || "Unable to load your portfolio profile.");
         }
@@ -88,6 +103,13 @@ function PortfolioMaker() {
     return () => document.removeEventListener("keydown", handleEscape);
   }, [showSuccessModal]);
 
+  const hasChanges = useMemo(() => {
+    if (!profileExists) return true;
+
+    return JSON.stringify(normalizeForm(formData)) !==
+      JSON.stringify(normalizeForm(savedFormData));
+  }, [formData, savedFormData, profileExists]);
+
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
     setFormData((current) => ({
@@ -100,6 +122,11 @@ function PortfolioMaker() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (saving) return;
+
+    if (profileExists && !hasChanges) {
+      setError("No changes detected. Update at least one field before saving again.");
+      return;
+    }
 
     try {
       setSaving(true);
@@ -121,6 +148,7 @@ function PortfolioMaker() {
 
       if (data?.profile) {
         setProfileExists(true);
+        setSavedFormData(normalizeForm(formData));
         setShowSuccessModal(true);
       }
     } catch (err) {
@@ -195,9 +223,15 @@ function PortfolioMaker() {
         </section>
 
         <div className="portfolio-form-actions">
-          <button type="submit" className="button button-primary" disabled={saving}>
+          <button type="submit" className="button button-primary" disabled={saving || (profileExists && !hasChanges)}>
             <Save size={18} />
-            {saving ? "Saving..." : profileExists ? "Save changes" : "Create profile"}
+            {saving
+              ? "Saving..."
+              : profileExists && !hasChanges
+                ? "No changes"
+                : profileExists
+                  ? "Save changes"
+                  : "Create profile"}
           </button>
         </div>
       </form>
@@ -215,8 +249,8 @@ function PortfolioMaker() {
               <button type="button" className="button button-ghost" onClick={() => setShowSuccessModal(false)}>Cancel</button>
               <button type="button" className="button button-primary" onClick={() => {
                 setShowSuccessModal(false);
-                navigate("/student/portfolio#portfolio-details");
-              }}>Continue to portfolio details <ArrowRight size={17} /></button>
+                navigate("/student/portfolio/project/add");
+              }}>Add your first project <ArrowRight size={17} /></button>
             </div>
           </section>
         </div>
