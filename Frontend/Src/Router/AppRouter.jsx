@@ -16,6 +16,7 @@ import AddEducation from "../Pages/Student/AddEducation";
 import AddExperience from "../Pages/Student/AddExperience";
 import AddCertificate from "../Pages/Student/AddCertificate";
 import PortfolioTemplates from "../Pages/Student/PortfolioTemplates";
+import PortfolioPreview from "../Pages/Student/PortfolioPreview";
 
 function PlaceholderPage({ title }) {
   return (
@@ -59,6 +60,7 @@ function AppRouter() {
         <Route path="portfolio/experience/add" element={<AddExperience />} />
         <Route path="portfolio/certificate/add" element={<AddCertificate />} />
         <Route path="portfolio/templates" element={<PortfolioTemplates />} />
+        <Route path="portfolio/preview" element={<PortfolioPreview />} />
         <Route path="resumes" element={<PlaceholderPage title="Resumes" />} />
         <Route path="ats" element={<PlaceholderPage title="ATS Checker" />} />
       </Route>
