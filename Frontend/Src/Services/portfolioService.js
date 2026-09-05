@@ -1,251 +1,34 @@
 import api from "./api";
 
-/* =========================================================
-   Main Student Profile
-   ========================================================= */
+export const getStudentProfile = async () => (await api.get("/students/portfolio")).data;
+export const createStudentProfile = async (profileData) => (await api.post("/students/portfolio", profileData)).data;
+export const updateStudentProfile = async (profileData) => (await api.put("/students/portfolio", profileData)).data;
+export const getCompletePortfolio = async () => (await api.get("/students/portfolio/all")).data;
 
-export const getStudentProfile = async () => {
-  const response = await api.get("/students/portfolio");
-  return response.data;
-};
+export const getProjects = async () => (await api.get("/students/portfolio/projects")).data;
+export const createProject = async (projectData) => (await api.post("/students/portfolio/projects", projectData)).data;
+export const updateProject = async (id, projectData) => (await api.put(`/students/portfolio/projects/${id}`, projectData)).data;
+export const deleteProject = async (id) => (await api.delete(`/students/portfolio/projects/${id}`)).data;
 
-export const createStudentProfile = async (profileData) => {
-  const response = await api.post(
-    "/students/portfolio",
-    profileData
-  );
+export const getExperiences = async () => (await api.get("/students/portfolio/experiences")).data;
+export const createExperience = async (experienceData) => (await api.post("/students/portfolio/experiences", experienceData)).data;
+export const updateExperience = async (id, experienceData) => (await api.put(`/students/portfolio/experiences/${id}`, experienceData)).data;
+export const deleteExperience = async (id) => (await api.delete(`/students/portfolio/experiences/${id}`)).data;
 
-  return response.data;
-};
+export const getEducation = async () => (await api.get("/students/portfolio/education")).data;
+export const createEducation = async (educationData) => (await api.post("/students/portfolio/education", educationData)).data;
+export const updateEducation = async (id, educationData) => (await api.put(`/students/portfolio/education/${id}`, educationData)).data;
+export const deleteEducation = async (id) => (await api.delete(`/students/portfolio/education/${id}`)).data;
 
-export const updateStudentProfile = async (profileData) => {
-  const response = await api.put(
-    "/students/portfolio",
-    profileData
-  );
+export const getSkills = async () => (await api.get("/students/portfolio/skills")).data;
+export const createSkill = async (skillData) => (await api.post("/students/portfolio/skills", skillData)).data;
+export const updateSkill = async (id, skillData) => (await api.put(`/students/portfolio/skills/${id}`, skillData)).data;
+export const deleteSkill = async (id) => (await api.delete(`/students/portfolio/skills/${id}`)).data;
 
-  return response.data;
-};
+export const getCertificates = async () => (await api.get("/students/portfolio/certificates")).data;
+export const createCertificate = async (certificateData) => (await api.post("/students/portfolio/certificates", certificateData)).data;
+export const updateCertificate = async (id, certificateData) => (await api.put(`/students/portfolio/certificates/${id}`, certificateData)).data;
+export const deleteCertificate = async (id) => (await api.delete(`/students/portfolio/certificates/${id}`)).data;
 
-/* =========================================================
-   Complete Portfolio
-   ========================================================= */
-
-export const getCompletePortfolio = async () => {
-  const response = await api.get("/students/portfolio/all");
-  return response.data;
-};
-
-/* =========================================================
-   Projects
-   ========================================================= */
-
-export const getProjects = async () => {
-  const response = await api.get(
-    "/students/portfolio/projects"
-  );
-
-  return response.data;
-};
-
-export const createProject = async (projectData) => {
-  const response = await api.post(
-    "/students/portfolio/projects",
-    projectData
-  );
-
-  return response.data;
-};
-
-export const updateProject = async (id, projectData) => {
-  const response = await api.put(
-    `/students/portfolio/projects/${id}`,
-    projectData
-  );
-
-  return response.data;
-};
-
-export const deleteProject = async (id) => {
-  const response = await api.delete(
-    `/students/portfolio/projects/${id}`
-  );
-
-  return response.data;
-};
-
-/* =========================================================
-   Experience
-   ========================================================= */
-
-export const getExperiences = async () => {
-  const response = await api.get(
-    "/students/portfolio/experiences"
-  );
-
-  return response.data;
-};
-
-export const createExperience = async (experienceData) => {
-  const response = await api.post(
-    "/students/portfolio/experiences",
-    experienceData
-  );
-
-  return response.data;
-};
-
-export const updateExperience = async (
-  id,
-  experienceData
-) => {
-  const response = await api.put(
-    `/students/portfolio/experiences/${id}`,
-    experienceData
-  );
-
-  return response.data;
-};
-
-export const deleteExperience = async (id) => {
-  const response = await api.delete(
-    `/students/portfolio/experiences/${id}`
-  );
-
-  return response.data;
-};
-
-/* =========================================================
-   Education
-   ========================================================= */
-
-export const getEducation = async () => {
-  const response = await api.get(
-    "/students/portfolio/education"
-  );
-
-  return response.data;
-};
-
-export const createEducation = async (educationData) => {
-  const response = await api.post(
-    "/students/portfolio/education",
-    educationData
-  );
-
-  return response.data;
-};
-
-export const updateEducation = async (
-  id,
-  educationData
-) => {
-  const response = await api.put(
-    `/students/portfolio/education/${id}`,
-    educationData
-  );
-
-  return response.data;
-};
-
-export const deleteEducation = async (id) => {
-  const response = await api.delete(
-    `/students/portfolio/education/${id}`
-  );
-
-  return response.data;
-};
-
-/* =========================================================
-   Skills
-   ========================================================= */
-
-export const getSkills = async () => {
-  const response = await api.get(
-    "/students/portfolio/skills"
-  );
-
-  return response.data;
-};
-
-export const createSkill = async (skillData) => {
-  const response = await api.post(
-    "/students/portfolio/skills",
-    skillData
-  );
-
-  return response.data;
-};
-
-export const updateSkill = async (id, skillData) => {
-  const response = await api.put(
-    `/students/portfolio/skills/${id}`,
-    skillData
-  );
-
-  return response.data;
-};
-
-export const deleteSkill = async (id) => {
-  const response = await api.delete(
-    `/students/portfolio/skills/${id}`
-  );
-
-  return response.data;
-};
-
-/* =========================================================
-   Certificates
-   ========================================================= */
-
-export const getCertificates = async () => {
-  const response = await api.get(
-    "/students/portfolio/certificates"
-  );
-
-  return response.data;
-};
-
-export const createCertificate = async (
-  certificateData
-) => {
-  const response = await api.post(
-    "/students/portfolio/certificates",
-    certificateData
-  );
-
-  return response.data;
-};
-
-export const updateCertificate = async (
-  id,
-  certificateData
-) => {
-  const response = await api.put(
-    `/students/portfolio/certificates/${id}`,
-    certificateData
-  );
-
-  return response.data;
-};
-
-export const deleteCertificate = async (id) => {
-  const response = await api.delete(
-    `/students/portfolio/certificates/${id}`
-  );
-
-  return response.data;
-};
-
-/* =========================================================
-   Public Portfolio Slug
-   ========================================================= */
-
-export const updatePortfolioSlug = async (slug) => {
-  const response = await api.put(
-    "/students/portfolio/slug",
-    { slug }
-  );
-
-  return response.data;
-};
+export const updatePortfolioSlug = async (slug) => (await api.put("/students/portfolio/slug", { slug })).data;
+export const getPublicPortfolio = async (slug) => (await api.get(`/public/profile/${slug}`)).data;
