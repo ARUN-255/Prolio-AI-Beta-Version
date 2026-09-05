@@ -17,6 +17,7 @@ import {
   getStudentProfile,
   updateStudentProfile,
 } from "../../Services/portfolioService";
+import "../../Styles/portfolioModal.css";
 
 const emptyForm = {
   headline: "",
