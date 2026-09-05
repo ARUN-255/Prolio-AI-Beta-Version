@@ -1,0 +1,126 @@
+.portfolio-share-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.portfolio-share-panel h2 {
+  margin: 4px 0 6px;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.portfolio-share-panel p {
+  margin: 0;
+  color: #64748b;
+}
+
+.portfolio-share-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+}
+
+.portfolio-share-row input,
+.portfolio-custom-link-controls input {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+}
+
+.portfolio-custom-link-box,
+.portfolio-free-link-note {
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.portfolio-custom-link-box > div:first-child,
+.portfolio-free-link-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.portfolio-custom-link-box small,
+.portfolio-free-link-note span,
+.portfolio-link-message {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.portfolio-custom-link-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.portfolio-custom-link-controls > span {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.portfolio-link-message {
+  margin-top: 8px !important;
+}
+
+.portfolio-watermark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 22px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.portfolio-watermark .brand-mark {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+.public-portfolio-page {
+  min-height: 100vh;
+  padding: 32px 20px;
+  background: #f8fafc;
+}
+
+.public-portfolio-status {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+}
+
+@media (max-width: 760px) {
+  .portfolio-share-row,
+  .portfolio-custom-link-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-share-row .button,
+  .portfolio-custom-link-controls .button {
+    width: 100%;
+  }
+
+  .public-portfolio-page {
+    padding: 14px;
+  }
+}
