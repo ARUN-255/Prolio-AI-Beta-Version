@@ -5,6 +5,20 @@ export const runAtsAnalysis = async (payload) => {
   return response.data;
 };
 
+export const runUploadedAtsAnalysis = async ({ file, jobTitle, jobDescription }) => {
+  const formData = new FormData();
+  formData.append("resume", file);
+  formData.append("job_title", jobTitle || "");
+  formData.append("job_description", jobDescription);
+
+  const response = await api.post(
+    "/students/ats/analyze-upload",
+    formData
+  );
+
+  return response.data;
+};
+
 export const getAtsAnalyses = async () => {
   const response = await api.get("/students/ats");
   return response.data;
