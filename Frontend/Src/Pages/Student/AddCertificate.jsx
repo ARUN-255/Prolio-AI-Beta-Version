@@ -166,11 +166,11 @@ function AddCertificate() {
             <button className="portfolio-modal-close" type="button" onClick={() => setShowSuccessModal(false)} aria-label="Close message"><X size={20} /></button>
             <span className="portfolio-success-icon"><CheckCircle2 size={30} /></span>
             <h2 id="certificate-success-title">Certificate saved successfully</h2>
-            <p>Your certificate has been added to your portfolio. You can add another certificate or return to the main portfolio page.</p>
+            <p>Your certificate has been added. You can add another certificate or continue to choose a portfolio template.</p>
             <div className="portfolio-modal-actions portfolio-modal-actions-stacked-mobile">
               <button type="button" className="button button-ghost" onClick={() => setShowSuccessModal(false)}>Cancel</button>
               <button type="button" className="button button-secondary" onClick={addAnotherCertificate}><Plus size={17} /> Add another certificate</button>
-              <button type="button" className="button button-primary" onClick={() => navigate("/student/portfolio")}>Finish portfolio details</button>
+              <button type="button" className="button button-primary" onClick={() => navigate("/student/portfolio/templates")}>Choose portfolio template</button>
             </div>
           </section>
         </div>
