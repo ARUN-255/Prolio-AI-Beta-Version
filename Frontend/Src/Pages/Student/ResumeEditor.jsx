@@ -7,6 +7,18 @@ import "../../Styles/resumes.css";
 const DEFAULT_ORDER = ["summary", "experience", "projects", "education", "skills", "certificates"];
 const LABELS = { summary: "Summary", experience: "Experience", projects: "Projects", education: "Education", skills: "Skills", certificates: "Certificates" };
 
+function Editable({ value, onChange, className = "", multiline = false, placeholder = "Click to edit" }) {
+  const props = {
+    className: `resume-inline-edit ${className}`,
+    value: value || "",
+    onChange: (e) => onChange(e.target.value),
+    placeholder,
+    spellCheck: true,
+  };
+
+  return multiline ? <textarea {...props} rows="2" /> : <input {...props} />;
+}
+
 function ResumeEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -98,17 +110,6 @@ function ResumeEditor() {
   };
 
   const visibleOrder = useMemo(() => order.filter((name) => !hidden.includes(name)), [order, hidden]);
-
-  const Editable = ({ value, onChange, className = "", multiline = false, placeholder = "Click to edit" }) => {
-    const props = {
-      className: `resume-inline-edit ${className}`,
-      value: value || "",
-      onChange: (e) => onChange(e.target.value),
-      placeholder,
-      spellCheck: true,
-    };
-    return multiline ? <textarea {...props} rows="2" /> : <input {...props} />;
-  };
 
   const renderSection = (name) => {
     if (name === "summary") return <section><h2>Summary</h2><Editable multiline value={resumeData.summary} onChange={updateSummary} className="resume-inline-paragraph" placeholder="Write your professional summary" /></section>;
